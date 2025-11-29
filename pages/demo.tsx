@@ -8,7 +8,7 @@ import { DataGrid } from "@/components/data-grid/data-grid";
 import { useDataGrid } from "@/hooks/use-data-grid";
 import { AddColumnMenu } from "@/components/AddColumnMenu";
 import type { ColumnType } from "@/types";
-import { Table, ChevronDown, Square, Play, Zap, Cpu, Brain } from "@/components/Icons";
+import { Table, ChevronDown, Square, Play, Zap, Cpu, Brain, Download } from "@/components/Icons";
 
 // Available Models
 const MODELS = [
@@ -335,6 +335,64 @@ export function DataGridDemo() {
     } as any,
   });
 
+  const handleExportToCSV = React.useCallback(() => {
+    const table = dataGridProps.table;
+    
+    // Get all visible columns (excluding select and actions columns)
+    const visibleColumns = table.getAllColumns().filter(
+      (column) => column.getIsVisible() && column.id !== 'select' && column.id !== 'actions'
+    );
+
+    if (visibleColumns.length === 0) {
+      return;
+    }
+
+    // Get column headers
+    const headers = visibleColumns.map((column) => {
+      const header = column.columnDef.header;
+      return typeof header === 'string' ? header : column.id;
+    });
+
+    // Helper function to escape CSV values
+    const escapeCSV = (value: any): string => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+      const stringValue = String(value);
+      // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    };
+
+    // Get all rows data
+    const rows = table.getRowModel().rows.map((row) => {
+      return visibleColumns.map((column) => {
+        const cellValue = row.getValue(column.id);
+        return escapeCSV(cellValue);
+      });
+    });
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.map(escapeCSV).join(','),
+      ...rows.map((row) => row.join(','))
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${projectName || 'data-grid'}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [dataGridProps.table, projectName]);
+
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Main Content Area */}
@@ -376,6 +434,17 @@ export function DataGridDemo() {
                 <Table className="w-3.5 h-3.5" />
                 Back to App
              </a>
+
+             {/* Export CSV Button */}
+             <button
+                onClick={handleExportToCSV}
+                disabled={data.length === 0 || columns.length === 0}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Export to CSV"
+             >
+                <Download className="w-3.5 h-3.5" />
+                Export CSV
+             </button>
 
              <div className="h-6 w-px bg-slate-200 mx-1"></div>
 
