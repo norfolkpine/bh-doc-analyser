@@ -15,6 +15,9 @@ import {
   List,
   Trash2
 } from './Icons';
+import { Textarea } from './ui/textarea';
+import { Button } from './ui/button';
+import { cn } from '../lib/utils';
 
 const COLUMN_TYPES: { type: ColumnType; label: string; icon: React.FC<any> }[] = [
   { type: 'text', label: 'Text', icon: Type },
@@ -153,27 +156,45 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
             </div>
 
             {/* Prompt Textarea */}
-            <div className="space-y-1.5">
-                 <div className="flex items-center gap-1.5 text-slate-500">
-                  <HelpCircle className="w-3.5 h-3.5" />
-                  <label className="text-xs font-semibold">Prompt</label>
+            <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                  <label className="text-xs font-semibold text-foreground">Prompt</label>
                 </div>
-                <div className="relative">
-                    <textarea 
-                        className="w-full border border-slate-200 bg-slate-50 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none min-h-[100px] resize-none transition-all"
-                        placeholder="Describe what data to extract..."
+                <div className="relative group">
+                    <Textarea 
+                        className={cn(
+                          "h-[120px] pr-24 resize-none overflow-y-auto",
+                          "focus-visible:ring-2"
+                        )}
+                        placeholder="Describe what data to extract from the document..."
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                     />
                     {/* AI Generate / Optimize Button */}
-                    <button 
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={handleAiGeneratePrompt}
                       disabled={isGeneratingPrompt || !name}
-                      className="absolute bottom-2 right-2 flex items-center gap-1.5 px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-medium text-slate-500 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-colors disabled:opacity-50"
+                      className={cn(
+                        "absolute bottom-2 right-2",
+                        "h-7 px-2.5 text-xs",
+                        "shadow-sm",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        "disabled:opacity-50 disabled:cursor-not-allowed"
+                      )}
                     >
-                      {isGeneratingPrompt ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                      {prompt ? "Optimize" : "AI Generate"}
-                    </button>
+                      {isGeneratingPrompt ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3 h-3" />
+                      )}
+                      <span className="ml-1.5">
+                        {prompt ? "Optimize" : "Generate"}
+                      </span>
+                    </Button>
                 </div>
             </div>
         </div>

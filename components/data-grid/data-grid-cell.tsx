@@ -14,6 +14,7 @@ import {
   ShortTextCell,
   UrlCell,
 } from "@/components/data-grid/data-grid-cell-variants";
+import type { FileCellData } from "@/types/data-grid";
 
 interface DataGridCellProps<TData> {
   cell: Cell<TData, unknown>;
@@ -147,9 +148,47 @@ export function DataGridCell<TData>({ cell, table }: DataGridCellProps<TData>) {
           readOnly={readOnly}
         />
       );
-    case "file":
+    case "file": {
+      // Check if the value is a string or FileCellData[]
+      const cellValue = cell.getValue();
+      
+      // If it's explicitly a string, render as ShortTextCell for text editing
+      if (typeof cellValue === 'string') {
+        return (
+          <ShortTextCell
+            cell={cell}
+            table={table}
+            rowIndex={rowIndex}
+            columnId={columnId}
+            isEditing={isEditing}
+            isFocused={isFocused}
+            isSelected={isSelected}
+            readOnly={readOnly}
+          />
+        );
+      }
+      
+      // If it's a FileCellData[] array with at least one file, render as FileCell
+      const isFileArray = Array.isArray(cellValue) && cellValue.length > 0;
+      if (isFileArray) {
+        return (
+          <FileCell
+            cell={cell}
+            table={table}
+            rowIndex={rowIndex}
+            columnId={columnId}
+            isEditing={isEditing}
+            isFocused={isFocused}
+            isSelected={isSelected}
+            readOnly={readOnly}
+          />
+        );
+      }
+      
+      // If empty (null, undefined, or empty array), render as ShortTextCell to allow text input
+      // Files can still be added via page-level drag-and-drop
       return (
-        <FileCell
+        <ShortTextCell
           cell={cell}
           table={table}
           rowIndex={rowIndex}
@@ -160,6 +199,7 @@ export function DataGridCell<TData>({ cell, table }: DataGridCellProps<TData>) {
           readOnly={readOnly}
         />
       );
+    }
 
     default:
       return (

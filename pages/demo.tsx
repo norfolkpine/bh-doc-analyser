@@ -8,7 +8,9 @@ import { DataGrid } from "@/components/data-grid/data-grid";
 import { useDataGrid } from "@/hooks/use-data-grid";
 import { AddColumnMenu } from "@/components/AddColumnMenu";
 import type { ColumnType } from "@/types";
-import { Table, ChevronDown, Square, Play, Zap, Cpu, Brain, Download } from "@/components/Icons";
+import type { FileCellData } from "@/types/data-grid";
+import { Table, ChevronDown, Square, Play, Zap, Cpu, Brain, Download, Upload } from "@/components/Icons";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 // Available Models
 const MODELS = [
@@ -19,6 +21,8 @@ const MODELS = [
 
 interface SkateTrick {
   id: string;
+  content?: FileCellData[] | string;
+  name?: FileCellData[] | string;
   trickName?: string;
   skaterName?: string;
   difficulty?: "beginner" | "intermediate" | "advanced" | "expert";
@@ -208,11 +212,16 @@ export function DataGridDemo() {
   const [editingColumnId, setEditingColumnId] = React.useState<string | null>(null);
   const [projectName, setProjectName] = React.useState('Data Grid Demo');
   const [isEditingProjectName, setIsEditingProjectName] = React.useState(false);
+  const [isDraggingOver, setIsDraggingOver] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<string>("files");
+  const [projectId, setProjectId] = React.useState<string | null>(null);
+  const [isSaving, setIsSaving] = React.useState(false);
   
   // Model State
   const [selectedModel, setSelectedModel] = React.useState<string>(MODELS[0].id);
   const [isModelMenuOpen, setIsModelMenuOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const processingAbortRef = React.useRef(false);
 
   const [columns, setColumns] = React.useState<ColumnDef<SkateTrick>[]>([]);
   const [columnMetadata, setColumnMetadata] = React.useState<Record<string, { type: ColumnType; prompt: string }>>({});
@@ -222,12 +231,13 @@ export function DataGridDemo() {
   const defaultColumns = React.useMemo<ColumnDef<SkateTrick>[]>(
     () => [
       {
-        id: "name",
-        accessorKey: "name" as any,
-        header: "Name",
+        id: "content",
+        accessorKey: "content" as any,
+        header: "Content",
         meta: {
           cell: {
-            variant: "short-text",
+            variant: "file",
+            multiple: false, // Only one file per cell
           },
         },
         size: COLUMN_SIZE.DEFAULT,
@@ -291,6 +301,117 @@ export function DataGridDemo() {
     setEditingColumnId(null);
   };
 
+  // Call AI API to process prompt with content
+  const callAI = async (content: string, prompt: string, modelId: string): Promise<string> => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+    try {
+      const response = await fetch(`${apiUrl}/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content,
+          prompt,
+          model: modelId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.result || '';
+    } catch (error) {
+      console.error('AI API call failed:', error);
+      throw error;
+    }
+  };
+
+  // Process cells using prompts and first column data
+  const handleRunAnalysis = React.useCallback(async () => {
+    processingAbortRef.current = false;
+    setIsProcessing(true);
+
+    // Get all columns except the first one
+    const processingColumns = columns.slice(1);
+
+    // Process each row
+    for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
+      // Check if processing was aborted
+      if (processingAbortRef.current) {
+        break;
+      }
+
+      const row = data[rowIndex];
+      const firstColumnValue = row[columns[0]?.id as keyof SkateTrick] || row.content;
+
+      // Skip if first column is empty
+      if (!firstColumnValue) continue;
+
+      // Handle FileCellData[] - extract file names
+      let contentToProcess: string;
+      if (Array.isArray(firstColumnValue) && firstColumnValue.length > 0) {
+        // If it's an array of FileCellData, use file names
+        contentToProcess = firstColumnValue.map(f => f.name).join(', ');
+      } else {
+        contentToProcess = String(firstColumnValue);
+      }
+
+      // Process each column for this row
+      for (const column of processingColumns) {
+        // Check if processing was aborted
+        if (processingAbortRef.current) {
+          break;
+        }
+
+        const columnId = column.id as string;
+        const metadata = columnMetadata[columnId];
+
+        if (!metadata?.prompt) continue;
+
+        try {
+          // Call AI API to process the content with the prompt
+          const result = await callAI(
+            contentToProcess,
+            metadata.prompt,
+            selectedModel
+          );
+
+          // Update the cell
+          setData(prevData => {
+            const newData = [...prevData];
+            newData[rowIndex] = {
+              ...newData[rowIndex],
+              [columnId]: result
+            };
+            return newData;
+          });
+        } catch (error) {
+          console.error(`Failed to process row ${rowIndex}, column ${columnId}:`, error);
+          // On error, keep the cell empty or show error
+          setData(prevData => {
+            const newData = [...prevData];
+            newData[rowIndex] = {
+              ...newData[rowIndex],
+              [columnId]: '[Error]'
+            };
+            return newData;
+          });
+        }
+      }
+    }
+
+    setIsProcessing(false);
+  }, [data, columns, columnMetadata, selectedModel]);
+
+  const handleStopProcessing = React.useCallback(() => {
+    processingAbortRef.current = true;
+    setIsProcessing(false);
+  }, []);
+
   const handleColumnAdd = () => {
     // Get the position of the + column header
     const addColumnButton = document.querySelector('[data-slot="grid-header-add-column"]');
@@ -315,12 +436,19 @@ export function DataGridDemo() {
     }
   };
 
+  const tableRef = React.useRef<any>(null);
+
   const onRowAdd = React.useCallback(() => {
+    // Clear sorting so new rows appear at the bottom
+    if (tableRef.current?.getState().sorting.length > 0) {
+      tableRef.current.setSorting([]);
+    }
+    
     setData((prev) => [...prev, { id: faker.string.nanoid() }]);
 
     return {
       rowIndex: data.length,
-      columnId: "trickName",
+      columnId: "content",
     };
   }, [data.length]);
 
@@ -334,6 +462,11 @@ export function DataGridDemo() {
       onColumnEdit: handleColumnEdit,
     } as any,
   });
+
+  // Store table reference for clearing sorting
+  React.useEffect(() => {
+    tableRef.current = dataGridProps.table;
+  }, [dataGridProps.table]);
 
   const handleExportToCSV = React.useCallback(() => {
     const table = dataGridProps.table;
@@ -358,7 +491,14 @@ export function DataGridDemo() {
       if (value === null || value === undefined) {
         return '';
       }
-      const stringValue = String(value);
+      // Handle FileCellData[] arrays
+      let stringValue: string;
+      if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && 'name' in value[0]) {
+        // It's an array of FileCellData, extract file names
+        stringValue = (value as FileCellData[]).map(f => f.name).join(', ');
+      } else {
+        stringValue = String(value);
+      }
       // If value contains comma, quote, or newline, wrap in quotes and escape quotes
       if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
         return `"${stringValue.replace(/"/g, '""')}"`;
@@ -493,17 +633,17 @@ export function DataGridDemo() {
 
              {/* Run / Stop Button */}
              {isProcessing ? (
-                <button 
-                  onClick={() => setIsProcessing(false)}
+                <button
+                  onClick={handleStopProcessing}
                   className="flex items-center gap-2 px-4 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-semibold rounded-md transition-all active:scale-95"
                 >
                   <Square className="w-3.5 h-3.5 fill-current" />
                   Stop
                 </button>
              ) : (
-                <button 
-                  onClick={() => setIsProcessing(true)}
-                  disabled={data.length === 0 || columns.length === 0}
+                <button
+                  onClick={handleRunAnalysis}
+                  disabled={data.length === 0 || columns.length <= 1}
                   className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 text-xs font-bold rounded-md transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
@@ -513,18 +653,112 @@ export function DataGridDemo() {
           </div>
         </header>
         {/* Workspace */}
-        <main className="flex-1 flex overflow-hidden relative">
-          <div className="flex-1 flex flex-col min-w-0 bg-white">
-            <div className="p-8">
-              <div className="max-w-7xl mx-auto">
-                <DataGrid
-                  {...dataGridProps}
-                  height={600}
-                  onColumnAdd={handleColumnAdd}
-                />
-              </div>
+        <main className="flex-1 flex flex-col overflow-hidden relative">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+            {/* Tabs Header */}
+            <div className="bg-white border-b border-slate-200 px-6 py-3 flex justify-center">
+              <TabsList className="w-full max-w-md grid grid-cols-3">
+                <TabsTrigger value="files">Files</TabsTrigger>
+                <TabsTrigger value="analyse">Analyse</TabsTrigger>
+                <TabsTrigger value="workflow">Workflow</TabsTrigger>
+              </TabsList>
             </div>
-          </div>
+
+            {/* Files Tab */}
+            <TabsContent value="files" className="flex-1 flex flex-col m-0 p-8 overflow-auto">
+              <div className="max-w-7xl mx-auto w-full">
+                <div className="text-center text-slate-500 py-12">
+                  <p className="text-lg">Files tab content</p>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Analyse Tab - DataGrid */}
+            <TabsContent value="analyse" className="flex-1 flex flex-col m-0 overflow-hidden">
+              <div 
+                className={`flex-1 flex flex-col min-w-0 bg-white relative ${isDraggingOver ? 'bg-indigo-50/30' : ''}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (e.dataTransfer.types.includes('Files')) {
+                    setIsDraggingOver(true);
+                  }
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // Only set to false if we're leaving the main container
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX;
+                  const y = e.clientY;
+                  if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+                    setIsDraggingOver(false);
+                  }
+                }}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingOver(false);
+                  
+                  const fileList = e.dataTransfer.files;
+                  if (!fileList || fileList.length === 0) return;
+
+                  const files = Array.from(fileList) as File[];
+                  if (files.length === 0) return;
+
+                  // Clear sorting so new rows appear at the bottom
+                  if (dataGridProps.table.getState().sorting.length > 0) {
+                    dataGridProps.table.setSorting([]);
+                  }
+
+                  // Create a new row for each file
+                  const newRows: SkateTrick[] = files.map((file: File) => {
+                    const fileData: FileCellData = {
+                      id: crypto.randomUUID(),
+                      name: file.name,
+                      size: file.size,
+                      type: file.type,
+                      url: URL.createObjectURL(file),
+                    };
+
+                    return {
+                      id: faker.string.nanoid(),
+                      content: [fileData],
+                    };
+                  });
+
+                  setData((prev) => [...prev, ...newRows]);
+                }}
+              >
+                {isDraggingOver && (
+                  <div className="absolute inset-0 z-50 flex items-center justify-center bg-indigo-50/80 backdrop-blur-sm border-2 border-indigo-400 border-dashed m-4 rounded-xl pointer-events-none">
+                    <div className="flex flex-col items-center">
+                      <Upload className="w-12 h-12 text-indigo-600 mb-2" />
+                      <p className="text-lg font-bold text-indigo-800">Drop files to create new rows</p>
+                    </div>
+                  </div>
+                )}
+                <div className="p-8">
+                  <div className="max-w-7xl mx-auto">
+                    <DataGrid
+                      {...dataGridProps}
+                      height={600}
+                      onColumnAdd={handleColumnAdd}
+                    />
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Workflow Tab */}
+            <TabsContent value="workflow" className="flex-1 flex flex-col m-0 p-8 overflow-auto">
+              <div className="max-w-7xl mx-auto w-full">
+                <div className="text-center text-slate-500 py-12">
+                  <p className="text-lg">Workflow tab content</p>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
 
           {/* Add/Edit Column Menu */}
           {addColumnAnchor && (
