@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from docling.document_converter import DocumentConverter
+from docling.datamodel.accelerator_options import AcceleratorOptions
 import tempfile
 import os
 import shutil
@@ -22,8 +23,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Configure GPU/CPU device for Docling
+# Options: "cpu", "cuda", or "auto" (auto-detects best available)
+device = os.getenv("DOCLING_DEVICE", "auto")  # Default to auto-detection
+accelerator_options = AcceleratorOptions(
+    device=device,  # Set to "cuda" for GPU, "cpu" for CPU, or "auto"
+    num_threads=int(os.getenv("DOCLING_NUM_THREADS", "4"))  # Adjust threads for CPU
+)
+
 # Initialize converter (this might take a moment to load models on startup)
-converter = DocumentConverter()
+converter = DocumentConverter(accelerator_options=accelerator_options)
 
 @app.post("/convert")
 async def convert_document(file: UploadFile = File(...)):

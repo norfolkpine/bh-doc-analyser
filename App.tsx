@@ -469,7 +469,7 @@ const App: React.FC = () => {
              </button>
 
              {/* Load Sample Button */}
-             <button 
+             <button
                 onClick={handleLoadSample}
                 className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-md transition-all active:scale-95"
                 title="Load Sample Columns"
@@ -477,6 +477,16 @@ const App: React.FC = () => {
                 <LayoutTemplate className="w-3.5 h-3.5" />
                 Load Sample
              </button>
+
+             {/* Demo Button */}
+             <a
+                href="#/demo"
+                className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-md transition-all active:scale-95"
+                title="View Data Grid Demo"
+             >
+                <Table className="w-3.5 h-3.5" />
+                Demo
+             </a>
 
              {/* Export Button */}
              <button 

@@ -51,16 +51,18 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
   const selectedType = COLUMN_TYPES.find(t => t.type === type) || COLUMN_TYPES[0];
 
   // Calculate position
-  // Default: Align the RIGHT edge of the menu with the RIGHT edge of the trigger (extends left)
-  // This prevents it from going off-screen for columns on the right side.
+  // Align the LEFT edge of the menu with the LEFT edge of the trigger (extends right)
   const MENU_WIDTH = 400;
   let top = triggerRect.bottom + 8;
-  let left = triggerRect.right - MENU_WIDTH;
+  let left = triggerRect.left;
 
-  // If that pushes it off-screen to the left (e.g. very first column on narrow screens), 
-  // force it to the left edge plus a margin.
-  if (left < 10) {
-    left = 10;
+  // If that pushes it off-screen to the right, align the RIGHT edge of the menu with the RIGHT edge of the trigger
+  if (left + MENU_WIDTH > window.innerWidth - 10) {
+    left = triggerRect.right - MENU_WIDTH;
+    // If that pushes it off-screen to the left, force it to the left edge plus a margin
+    if (left < 10) {
+      left = 10;
+    }
   }
 
   const handleAiGeneratePrompt = async () => {
