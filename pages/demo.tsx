@@ -19,203 +19,15 @@ const MODELS = [
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Fastest', icon: Zap },
 ];
 
-interface SkateTrick {
-  id: string;
-  content?: FileCellData[] | string;
-  name?: FileCellData[] | string;
-  trickName?: string;
-  skaterName?: string;
-  difficulty?: "beginner" | "intermediate" | "advanced" | "expert";
-  variant?: "flip" | "grind" | "grab" | "transition" | "manual" | "slide";
-  landed?: boolean;
-  attempts?: number;
-  bestScore?: number;
-  location?: string;
-  dateAttempted?: string;
-}
-
-const skateSpots = [
-  "Venice Beach Skate Park",
-  "Burnside Skate Park",
-  "Love Park (Philadelphia)",
-  "MACBA (Barcelona)",
-  "Southbank (London)",
-  "FDR Skate Park",
-  "Brooklyn Banks",
-  "El Toro High School",
-  "Hubba Hideout",
-  "Wallenberg High School",
-  "EMB (Embarcadero)",
-  "Pier 7 (San Francisco)",
-] as const;
-
-const skateTricks = {
-  flip: [
-    "Kickflip",
-    "Heelflip",
-    "Tre Flip",
-    "Hardflip",
-    "Inward Heelflip",
-    "Frontside Flip",
-    "Backside Flip",
-    "Varial Flip",
-    "Varial Heelflip",
-    "Double Flip",
-    "Laser Flip",
-    "Anti-Casper Flip",
-    "Casper Flip",
-    "Impossible",
-    "360 Flip",
-    "Big Spin",
-    "Bigspin Flip",
-  ],
-  grind: [
-    "50-50 Grind",
-    "5-0 Grind",
-    "Nosegrind",
-    "Crooked Grind",
-    "Feeble Grind",
-    "Smith Grind",
-    "Lipslide",
-    "Boardslide",
-    "Tailslide",
-    "Noseslide",
-    "Bluntslide",
-    "Nollie Backside Lipslide",
-    "Switch Frontside Boardslide",
-  ],
-  grab: [
-    "Indy Grab",
-    "Melon Grab",
-    "Stalefish",
-    "Tail Grab",
-    "Nose Grab",
-    "Method",
-    "Mute Grab",
-    "Crail Grab",
-    "Seatbelt Grab",
-    "Roast Beef",
-    "Chicken Wing",
-    "Tweaked Indy",
-    "Japan Air",
-  ],
-  transition: [
-    "Frontside Air",
-    "Backside Air",
-    "McTwist",
-    "540",
-    "720",
-    "900",
-    "Frontside 180",
-    "Backside 180",
-    "Frontside 360",
-    "Backside 360",
-    "Alley-Oop",
-    "Fakie",
-    "Revert",
-    "Carve",
-    "Pump",
-    "Drop In",
-  ],
-  manual: [
-    "Manual",
-    "Nose Manual",
-    "Casper",
-    "Rail Stand",
-    "Pogo",
-    "Handstand",
-    "One Foot Manual",
-    "Spacewalk",
-    "Truckstand",
-    "Primo",
-  ],
-  slide: [
-    "Powerslide",
-    "Bert Slide",
-    "Coleman Slide",
-    "Pendulum Slide",
-    "Stand-up Slide",
-    "Toeside Slide",
-    "Heelside Slide",
-  ],
-} as const;
-
-function generateTrickData(): SkateTrick[] {
-  return Array.from({ length: 50 }, () => {
-    const variant = faker.helpers.arrayElement(
-      Object.keys(skateTricks) as Array<keyof typeof skateTricks>,
-    );
-    const trickName = faker.helpers.arrayElement(skateTricks[variant]);
-    const skaterName = faker.person.fullName();
-    const attempts = faker.number.int({ min: 1, max: 50 });
-    const landed = faker.datatype.boolean(0.6);
-
-    const getDifficulty = (trick: string): SkateTrick["difficulty"] => {
-      const expertTricks = [
-        "Tre Flip",
-        "900",
-        "McTwist",
-        "Laser Flip",
-        "Impossible",
-      ];
-      const advancedTricks = [
-        "Hardflip",
-        "720",
-        "540",
-        "Crooked Grind",
-        "Switch Frontside Boardslide",
-      ];
-      const intermediateTricks = [
-        "Kickflip",
-        "Heelflip",
-        "Frontside 180",
-        "50-50 Grind",
-        "Boardslide",
-      ];
-
-      if (expertTricks.some((t) => trick.includes(t))) return "expert";
-      if (advancedTricks.some((t) => trick.includes(t))) return "advanced";
-      if (intermediateTricks.some((t) => trick.includes(t)))
-        return "intermediate";
-      return "beginner";
-    };
-
-    const difficulty = getDifficulty(trickName);
-
-    return {
-      id: faker.string.nanoid(),
-      trickName,
-      skaterName,
-      difficulty,
-      variant,
-      landed,
-      attempts,
-      bestScore: landed
-        ? faker.number.int({ min: 6, max: 10 })
-        : faker.number.int({ min: 1, max: 5 }),
-      location: faker.helpers.arrayElement(skateSpots),
-      dateAttempted:
-        faker.date
-          .between({
-            from: new Date(2023, 0, 1),
-            to: new Date(),
-          })
-          .toISOString()
-          .split("T")[0] ?? "",
-    };
-  });
-}
 
 export function DataGridDemo() {
-  const [data, setData] = React.useState<SkateTrick[]>([{ id: faker.string.nanoid() }]);
+  const [data, setData] = React.useState<Record<string, any>[]>([{ id: faker.string.nanoid() }]);
   const [addColumnAnchor, setAddColumnAnchor] = React.useState<DOMRect | null>(null);
   const [editingColumnId, setEditingColumnId] = React.useState<string | null>(null);
   const [projectName, setProjectName] = React.useState('Data Grid Demo');
   const [isEditingProjectName, setIsEditingProjectName] = React.useState(false);
   const [isDraggingOver, setIsDraggingOver] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<string>("files");
-  const [projectId, setProjectId] = React.useState<string | null>(null);
-  const [isSaving, setIsSaving] = React.useState(false);
   
   // Model State
   const [selectedModel, setSelectedModel] = React.useState<string>(MODELS[0].id);
@@ -223,12 +35,12 @@ export function DataGridDemo() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const processingAbortRef = React.useRef(false);
 
-  const [columns, setColumns] = React.useState<ColumnDef<SkateTrick>[]>([]);
+  const [columns, setColumns] = React.useState<ColumnDef<Record<string, any>>[]>([]);
   const [columnMetadata, setColumnMetadata] = React.useState<Record<string, { type: ColumnType; prompt: string }>>({});
   
   const currentModel = MODELS.find(m => m.id === selectedModel) || MODELS[0];
 
-  const defaultColumns = React.useMemo<ColumnDef<SkateTrick>[]>(
+  const defaultColumns = React.useMemo<ColumnDef<Record<string, any>>[]>(
     () => [
       {
         id: "content",
@@ -266,7 +78,7 @@ export function DataGridDemo() {
       'list': 'long-text',
     };
 
-    const newColumn: ColumnDef<SkateTrick> = {
+    const newColumn: ColumnDef<Record<string, any>> = {
       id: columnId,
       accessorKey: columnId as any,
       header: colDef.name,
@@ -346,7 +158,7 @@ export function DataGridDemo() {
       }
 
       const row = data[rowIndex];
-      const firstColumnValue = row[columns[0]?.id as keyof SkateTrick] || row.content;
+      const firstColumnValue = row[columns[0]?.id as string] || row.content;
 
       // Skip if first column is empty
       if (!firstColumnValue) continue;
@@ -652,113 +464,91 @@ export function DataGridDemo() {
              )}
           </div>
         </header>
-        {/* Workspace */}
-        <main className="flex-1 flex flex-col overflow-hidden relative">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            {/* Tabs Header */}
-            <div className="bg-white border-b border-slate-200 px-6 py-3 flex justify-center">
-              <TabsList className="w-full max-w-md grid grid-cols-3">
-                <TabsTrigger value="files">Files</TabsTrigger>
-                <TabsTrigger value="analyse">Analyse</TabsTrigger>
-                <TabsTrigger value="workflow">Workflow</TabsTrigger>
-              </TabsList>
-            </div>
-
-            {/* Files Tab */}
-            <TabsContent value="files" className="flex-1 flex flex-col m-0 p-8 overflow-auto">
-              <div className="max-w-7xl mx-auto w-full">
-                <div className="text-center text-slate-500 py-12">
-                  <p className="text-lg">Files tab content</p>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Analyse Tab - DataGrid */}
-            <TabsContent value="analyse" className="flex-1 flex flex-col m-0 overflow-hidden">
-              <div 
-                className={`flex-1 flex flex-col min-w-0 bg-white relative ${isDraggingOver ? 'bg-indigo-50/30' : ''}`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (e.dataTransfer.types.includes('Files')) {
-                    setIsDraggingOver(true);
-                  }
-                }}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  // Only set to false if we're leaving the main container
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const x = e.clientX;
-                  const y = e.clientY;
-                  if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
-                    setIsDraggingOver(false);
-                  }
-                }}
-                onDrop={async (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDraggingOver(false);
-                  
-                  const fileList = e.dataTransfer.files;
-                  if (!fileList || fileList.length === 0) return;
-
-                  const files = Array.from(fileList) as File[];
-                  if (files.length === 0) return;
-
-                  // Clear sorting so new rows appear at the bottom
-                  if (dataGridProps.table.getState().sorting.length > 0) {
-                    dataGridProps.table.setSorting([]);
-                  }
-
-                  // Create a new row for each file
-                  const newRows: SkateTrick[] = files.map((file: File) => {
-                    const fileData: FileCellData = {
-                      id: crypto.randomUUID(),
-                      name: file.name,
-                      size: file.size,
-                      type: file.type,
-                      url: URL.createObjectURL(file),
-                    };
-
-                    return {
-                      id: faker.string.nanoid(),
-                      content: [fileData],
-                    };
-                  });
-
-                  setData((prev) => [...prev, ...newRows]);
-                }}
-              >
-                {isDraggingOver && (
-                  <div className="absolute inset-0 z-50 flex items-center justify-center bg-indigo-50/80 backdrop-blur-sm border-2 border-indigo-400 border-dashed m-4 rounded-xl pointer-events-none">
-                    <div className="flex flex-col items-center">
-                      <Upload className="w-12 h-12 text-indigo-600 mb-2" />
-                      <p className="text-lg font-bold text-indigo-800">Drop files to create new rows</p>
-                    </div>
-                  </div>
-                )}
-                <div className="p-8">
-                  <div className="max-w-7xl mx-auto">
-                    <DataGrid
-                      {...dataGridProps}
-                      height={600}
-                      onColumnAdd={handleColumnAdd}
-                    />
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Workflow Tab */}
-            <TabsContent value="workflow" className="flex-1 flex flex-col m-0 p-8 overflow-auto">
-              <div className="max-w-7xl mx-auto w-full">
-                <div className="text-center text-slate-500 py-12">
-                  <p className="text-lg">Workflow tab content</p>
-                </div>
-              </div>
-            </TabsContent>
+        {/* Tabs */}
+        <div className="bg-white border-b border-slate-200 px-6 py-3 flex justify-center">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-md">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="files">Files</TabsTrigger>
+              <TabsTrigger value="analyse">Analyse</TabsTrigger>
+              <TabsTrigger value="workflow">Workflow</TabsTrigger>
+            </TabsList>
           </Tabs>
+        </div>
+        {/* Workspace */}
+        <main className="flex-1 flex overflow-hidden relative">
+          <div 
+            className={`flex-1 flex flex-col min-w-0 bg-white relative ${isDraggingOver ? 'bg-indigo-50/30' : ''}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.dataTransfer.types.includes('Files')) {
+                setIsDraggingOver(true);
+              }
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // Only set to false if we're leaving the main container
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX;
+              const y = e.clientY;
+              if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+                setIsDraggingOver(false);
+              }
+            }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDraggingOver(false);
+              
+              const fileList = e.dataTransfer.files;
+              if (!fileList || fileList.length === 0) return;
+
+              const files = Array.from(fileList) as File[];
+              if (files.length === 0) return;
+
+              // Clear sorting so new rows appear at the bottom
+              if (dataGridProps.table.getState().sorting.length > 0) {
+                dataGridProps.table.setSorting([]);
+              }
+
+              // Create a new row for each file
+              const newRows: Record<string, any>[] = files.map((file: File) => {
+                const fileData: FileCellData = {
+                  id: crypto.randomUUID(),
+                  name: file.name,
+                  size: file.size,
+                  type: file.type,
+                  url: URL.createObjectURL(file),
+                };
+
+                return {
+                  id: faker.string.nanoid(),
+                  content: [fileData],
+                };
+              });
+
+              setData((prev) => [...prev, ...newRows]);
+            }}
+          >
+            {isDraggingOver && (
+              <div className="absolute inset-0 z-50 flex items-center justify-center bg-indigo-50/80 backdrop-blur-sm border-2 border-indigo-400 border-dashed m-4 rounded-xl pointer-events-none">
+                <div className="flex flex-col items-center">
+                  <Upload className="w-12 h-12 text-indigo-600 mb-2" />
+                  <p className="text-lg font-bold text-indigo-800">Drop files to create new rows</p>
+                </div>
+              </div>
+            )}
+            <div className="p-8">
+              <div className="max-w-7xl mx-auto">
+                <DataGrid
+                  {...dataGridProps}
+                  height={600}
+                  onColumnAdd={handleColumnAdd}
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Add/Edit Column Menu */}
           {addColumnAnchor && (
