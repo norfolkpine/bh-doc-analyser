@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DocumentFile, Column, ExtractionResult, ExtractionCell } from '../types';
 import { FileText, Plus, Loader2, AlertCircle, CheckCircle2, ChevronRight, MoreHorizontal, Trash2 } from './Icons';
 
@@ -34,8 +34,10 @@ export const DataGrid: React.FC<DataGridProps> = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [resizingColId, setResizingColId] = useState<string | null>(null);
-  const [startX, setStartX] = useState(0);
-  const [startWidth, setStartWidth] = useState(0);
+  const resizeHandlersRef = React.useRef<{
+    handleMouseMove: ((e: MouseEvent) => void) | null;
+    handleMouseUp: (() => void) | null;
+  }>({ handleMouseMove: null, handleMouseUp: null });
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -58,27 +60,52 @@ export const DataGrid: React.FC<DataGridProps> = ({
     }
   };
 
+  const cleanupResize = React.useCallback(() => {
+    if (resizeHandlersRef.current.handleMouseMove) {
+      document.removeEventListener('mousemove', resizeHandlersRef.current.handleMouseMove);
+      resizeHandlersRef.current.handleMouseMove = null;
+    }
+    if (resizeHandlersRef.current.handleMouseUp) {
+      document.removeEventListener('mouseup', resizeHandlersRef.current.handleMouseUp);
+      resizeHandlersRef.current.handleMouseUp = null;
+    }
+  }, []);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      cleanupResize();
+    };
+  }, [cleanupResize]);
+
   const handleResizeStart = (e: React.MouseEvent, colId: string, currentWidth: number) => {
     e.preventDefault();
     e.stopPropagation();
-    setResizingColId(colId);
-    setStartX(e.clientX);
-    setStartWidth(currentWidth);
+    
+    // Clean up any existing resize handlers first
+    cleanupResize();
+    
+    const startX = e.clientX;
+    const startWidth = currentWidth;
     
     const handleMouseMove = (moveEvent: MouseEvent) => {
         if (onColumnResize) {
-            const diff = moveEvent.clientX - e.clientX;
+            const diff = moveEvent.clientX - startX;
             const newWidth = Math.max(100, startWidth + diff); // Min width 100px
             onColumnResize(colId, newWidth);
         }
     };
 
     const handleMouseUp = () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        cleanupResize();
         setResizingColId(null);
     };
 
+    // Store handlers in ref so we can clean them up
+    resizeHandlersRef.current.handleMouseMove = handleMouseMove;
+    resizeHandlersRef.current.handleMouseUp = handleMouseUp;
+    
+    setResizingColId(colId);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
