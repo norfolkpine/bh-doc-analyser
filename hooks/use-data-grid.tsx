@@ -2010,6 +2010,7 @@ function useDataGrid<TData>({
         onFilesDelete: propsRef.current.onFilesDelete
           ? propsRef.current.onFilesDelete
           : undefined,
+        onViewFile: propsRef.current.meta?.onViewFile,
         contextMenu,
         onContextMenuOpenChange,
         pasteDialog,

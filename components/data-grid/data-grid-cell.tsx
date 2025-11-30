@@ -21,6 +21,21 @@ interface DataGridCellProps<TData> {
   table: Table<TData>;
 }
 
+// Helper to check if a value is a FileCellData array
+function isFileCellDataArray(value: unknown): value is FileCellData[] {
+  if (!Array.isArray(value)) return false;
+  if (value.length === 0) return false;
+  // Check if the first item has the shape of FileCellData
+  const first = value[0];
+  return (
+    typeof first === "object" &&
+    first !== null &&
+    "id" in first &&
+    "name" in first &&
+    "size" in first
+  );
+}
+
 export function DataGridCell<TData>({ cell, table }: DataGridCellProps<TData>) {
   const meta = table.options.meta;
   const originalRowIndex = cell.row.index;
@@ -42,7 +57,22 @@ export function DataGridCell<TData>({ cell, table }: DataGridCellProps<TData>) {
   const readOnly = meta?.readOnly ?? false;
 
   const cellOpts = cell.column.columnDef.meta?.cell;
-  const variant = cellOpts?.variant ?? "text";
+  const configuredVariant = cellOpts?.variant ?? "text";
+  
+  // Auto-detect variant based on cell value for "auto" or "file" variants
+  // This allows mixed content (files and text) in the same column
+  const cellValue = cell.getValue();
+  let variant = configuredVariant;
+  
+  if (configuredVariant === "auto" || configuredVariant === "file") {
+    // If the value is a FileCellData array, render as file
+    // Otherwise, render as short-text (allowing text input)
+    if (isFileCellDataArray(cellValue)) {
+      variant = "file";
+    } else if (configuredVariant === "auto") {
+      variant = "short-text";
+    }
+  }
 
   switch (variant) {
     case "short-text":

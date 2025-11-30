@@ -7,7 +7,7 @@ export interface DocumentFile {
   mimeType: string;
 }
 
-export type ColumnType = 'text' | 'number' | 'date' | 'boolean' | 'list' | 'file';
+export type ColumnType = 'short-text' | 'long-text' | 'number' | 'date' | 'boolean' | 'list' | 'file';
 
 export interface Column {
   id: string;

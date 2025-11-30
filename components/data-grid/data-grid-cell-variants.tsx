@@ -2,6 +2,7 @@
 
 import {
   Check,
+  Eye,
   File,
   FileArchive,
   FileAudio,
@@ -10,6 +11,7 @@ import {
   FileText,
   FileVideo,
   Presentation,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -1959,12 +1961,48 @@ export function FileCell<TData>({
               <Badge
                 key={file.id}
                 variant="secondary"
-                className="h-5 shrink-0 gap-1 px-1.5 text-xs"
+                className="group/file h-5 shrink-0 gap-1 px-1.5 text-xs hover:bg-primary/10 transition-colors"
               >
                 {React.createElement(getFileIcon(file.type), {
                   className: "size-3 shrink-0",
                 })}
                 <span className="max-w-[100px] truncate">{file.name}</span>
+                <div className="flex items-center gap-0.5 ml-0.5">
+                  {meta?.onViewFile && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const rowData = table.options.data[rowIndex];
+                        if (rowData) {
+                          meta.onViewFile?.({
+                            file,
+                            rowIndex,
+                            columnId,
+                            row: rowData,
+                          });
+                        }
+                      }}
+                      className="p-0.5 rounded hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                      title="View document"
+                    >
+                      <Eye className="size-3" />
+                    </button>
+                  )}
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFile(file.id);
+                      }}
+                      className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                      title="Delete file"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  )}
+                </div>
               </Badge>
             );
           })}

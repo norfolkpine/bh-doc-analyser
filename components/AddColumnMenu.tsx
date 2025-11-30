@@ -9,6 +9,7 @@ import {
   Sparkles, 
   Loader2,
   Type,
+  WrapText,
   Hash,
   Calendar,
   CheckSquare,
@@ -21,7 +22,8 @@ import { Button } from './ui/button';
 import { cn } from '../lib/utils';
 
 const COLUMN_TYPES: { type: ColumnType; label: string; icon: React.FC<any> }[] = [
-  { type: 'text', label: 'Text', icon: Type },
+  { type: 'short-text', label: 'Short Text', icon: Type },
+  { type: 'long-text', label: 'Long Text', icon: WrapText },
   { type: 'number', label: 'Number', icon: Hash },
   { type: 'date', label: 'Date', icon: Calendar },
   { type: 'boolean', label: 'Yes/No', icon: CheckSquare },
@@ -47,7 +49,7 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
   initialData
 }) => {
   const [name, setName] = useState(initialData?.name || '');
-  const [type, setType] = useState<ColumnType>(initialData?.type || 'text');
+  const [type, setType] = useState<ColumnType>(initialData?.type || 'short-text');
   const [prompt, setPrompt] = useState(initialData?.prompt || '');
   
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);

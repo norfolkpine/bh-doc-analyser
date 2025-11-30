@@ -9,7 +9,7 @@ import { useDataGrid } from "@/hooks/use-data-grid";
 import { AddColumnMenu } from "@/components/AddColumnMenu";
 import type { ColumnType } from "@/types";
 import type { FileCellData } from "@/types/data-grid";
-import { Table, ChevronDown, Square, Play, Zap, Cpu, Brain, Download, Upload, Loader2, AlertCircle, CheckCircle2 } from "@/components/Icons";
+import { Table, ChevronDown, Square, Play, Zap, Cpu, Brain, Download, Upload, Loader2, AlertCircle, CheckCircle2, X, FileText, Eye } from "@/components/Icons";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { processDocumentFiles } from "@/services/documentProcessingService";
 
@@ -51,9 +51,25 @@ export function DataGridDemo() {
   const processingAbortRef = React.useRef(false);
 
   const [columns, setColumns] = React.useState<ColumnDef<Record<string, any>>[]>([]);
-  const [columnMetadata, setColumnMetadata] = React.useState<Record<string, { type: ColumnType; prompt: string }>>({});
+  const [columnMetadata, setColumnMetadata] = React.useState<Record<string, { type: ColumnType; prompt: string }>>({
+    content: { type: 'short-text', prompt: '' }, // Content column is editable via column menu
+  });
+  
+  // Document Viewer Sidebar State
+  const [selectedRowId, setSelectedRowId] = React.useState<string | null>(null);
+  const selectedRow = React.useMemo(() => data.find(r => r.id === selectedRowId), [data, selectedRowId]);
   
   const currentModel = MODELS.find(m => m.id === selectedModel) || MODELS[0];
+  
+  // Decode markdown content for display
+  const decodedMarkdown = React.useMemo(() => {
+    if (!selectedRow?.processedContent) return null;
+    try {
+      return decodeURIComponent(escape(atob(selectedRow.processedContent)));
+    } catch {
+      return selectedRow.processedContent;
+    }
+  }, [selectedRow?.processedContent]);
 
   const defaultColumns = React.useMemo<ColumnDef<Record<string, any>>[]>(
     () => [
@@ -63,11 +79,11 @@ export function DataGridDemo() {
         header: "Content",
         meta: {
           cell: {
-            variant: "file",
-            multiple: false, // Only one file per cell
+            variant: "auto", // Auto-detects: shows file badge for files, text input for text
+            multiple: false,
           },
         },
-        size: COLUMN_SIZE.DEFAULT,
+        size: 200, // Wider to fit file badge with view/delete icons
         minSize: COLUMN_SIZE.MIN,
         maxSize: COLUMN_SIZE.MAX,
       },
@@ -87,7 +103,8 @@ export function DataGridDemo() {
 
     // Map ColumnType to cell variant
     const variantMap: Record<ColumnType, string> = {
-      'text': 'short-text',
+      'short-text': 'short-text',
+      'long-text': 'long-text',
       'number': 'number',
       'date': 'date',
       'boolean': 'checkbox',
@@ -95,16 +112,19 @@ export function DataGridDemo() {
       'file': 'file',
     };
 
+    // Special handling for content column - preserve accessorKey
+    const isContentColumn = editingColumnId === 'content';
+    
     const newColumn: ColumnDef<Record<string, any>> = {
       id: columnId,
       accessorKey: columnId as any,
-      header: colDef.name,
+      header: isContentColumn ? 'Content' : colDef.name, // Keep Content header for content column
       meta: {
         cell: colDef.type === 'file' 
           ? {
               variant: "file" as const,
-              multiple: true,
-              maxFiles: 10,
+              multiple: isContentColumn ? false : true, // Content column only allows single file
+              maxFiles: isContentColumn ? 1 : 10,
               maxFileSize: 10 * 1024 * 1024, // 10MB
             }
           : {
@@ -298,15 +318,131 @@ export function DataGridDemo() {
     };
   }, [data.length]);
 
+  // Handle view file to open document viewer sidebar
+  const handleViewFile = React.useCallback(({ rowIndex }: {
+    file: FileCellData;
+    rowIndex: number;
+    columnId: string;
+    row: RowData;
+  }) => {
+    const row = data[rowIndex];
+    if (row?.id) {
+      setSelectedRowId(row.id);
+    }
+  }, [data]);
+
+  const onRowsDelete = React.useCallback(async (rows: RowData[], rowIndices: number[]) => {
+    // Remove deleted rows from data
+    setData((prev) => prev.filter((_, index) => !rowIndices.includes(index)));
+    
+    // Clear selected row if it was deleted
+    if (selectedRowId && rows.some(r => r.id === selectedRowId)) {
+      setSelectedRowId(null);
+    }
+  }, [selectedRowId]);
+
+  // Handle file uploads within cells
+  const onFilesUpload = React.useCallback(async ({ files, rowIndex, columnId }: {
+    files: File[];
+    rowIndex: number;
+    columnId: string;
+    row: RowData;
+  }): Promise<FileCellData[]> => {
+    // Note: "auto" variant auto-detects file vs text based on cell value
+    // No need to switch column variant - just set the file data and it will render correctly
+
+    // Create FileCellData objects for each file
+    const uploadedFiles: FileCellData[] = files.map((file) => ({
+      id: crypto.randomUUID(),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      url: URL.createObjectURL(file),
+    }));
+
+    // Process files for content column (document conversion)
+    if (columnId === 'content' && files.length > 0) {
+      setIsConverting(true);
+      
+      try {
+        const result = await processDocumentFiles(files);
+        
+        if (result.success.length > 0) {
+          const processedFile = result.success[0];
+          // Update row with processed content
+          setData((prev) => prev.map((row, idx) => 
+            idx === rowIndex 
+              ? { 
+                  ...row, 
+                  processedContent: processedFile.content,
+                  processingStatus: 'completed' as ProcessingStatus,
+                }
+              : row
+          ));
+        } else if (result.errors.length > 0) {
+          setData((prev) => prev.map((row, idx) => 
+            idx === rowIndex 
+              ? { 
+                  ...row, 
+                  processingStatus: 'error' as ProcessingStatus,
+                  errorMessage: result.errors[0].error,
+                }
+              : row
+          ));
+        }
+      } catch (error) {
+        setData((prev) => prev.map((row, idx) => 
+          idx === rowIndex 
+            ? { 
+                ...row, 
+                processingStatus: 'error' as ProcessingStatus,
+                errorMessage: error instanceof Error ? error.message : 'Unknown error',
+              }
+            : row
+        ));
+      } finally {
+        setIsConverting(false);
+      }
+    }
+
+    return uploadedFiles;
+  }, []);
+
+  // Handle file deletions within cells
+  const onFilesDelete = React.useCallback(async ({ fileIds, rowIndex, columnId }: {
+    fileIds: string[];
+    rowIndex: number;
+    columnId: string;
+    row: RowData;
+  }) => {
+    // Clear processed content when file is deleted from content column
+    if (columnId === 'content') {
+      setData((prev) => prev.map((row, idx) => 
+        idx === rowIndex 
+          ? { 
+              ...row, 
+              processedContent: undefined,
+              processingStatus: undefined,
+              errorMessage: undefined,
+            }
+          : row
+      ));
+    }
+  }, []);
+
   const dataGridProps = useDataGrid({
     columns,
     data,
     onDataChange: setData,
     onRowAdd,
+    onRowsDelete,
+    onFilesUpload,
+    onFilesDelete,
     enableSearch: true,
     enablePaste: true,
     meta: {
       onColumnEdit: handleColumnEdit,
+      onViewFile: handleViewFile,
     } as any,
   });
 
@@ -542,6 +678,9 @@ export function DataGridDemo() {
               const files = Array.from(fileList) as File[];
               if (files.length === 0) return;
 
+              // Note: "auto" variant auto-detects file vs text based on cell value
+              // No need to switch column variant - just set the file data and it will render correctly
+
               // Clear sorting so new rows appear at the bottom
               if (dataGridProps.table.getState().sorting.length > 0) {
                 dataGridProps.table.setSorting([]);
@@ -647,7 +786,7 @@ export function DataGridDemo() {
               </div>
             )}
             <div className="p-8">
-              <div className="max-w-7xl mx-auto">
+              <div className={`transition-all duration-300 ${selectedRowId ? 'max-w-5xl' : 'max-w-7xl'} mx-auto`}>
                 <DataGrid
                   {...dataGridProps}
                   height={600}
@@ -655,6 +794,89 @@ export function DataGridDemo() {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Document Viewer Sidebar */}
+          <div 
+            className={`transition-all duration-300 ease-in-out border-l border-slate-200 bg-white shadow-xl relative flex flex-col ${
+              selectedRowId ? 'w-[500px] translate-x-0' : 'w-0 translate-x-10 opacity-0 overflow-hidden'
+            }`}
+          >
+            {selectedRow && (
+              <div className="w-full h-full flex flex-col">
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                        Document Preview
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900 truncate max-w-[280px]" title={selectedRow.content?.[0]?.name}>
+                        {selectedRow.content?.[0]?.name || 'Untitled'}
+                      </span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedRowId(null)} 
+                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Status Badge */}
+                {selectedRow.processingStatus && selectedRow.processingStatus !== 'completed' && (
+                  <div className={`mx-4 mt-4 px-3 py-2 rounded-lg flex items-center gap-2 text-sm ${
+                    selectedRow.processingStatus === 'processing' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                    selectedRow.processingStatus === 'pending' ? 'bg-slate-50 text-slate-600 border border-slate-200' :
+                    'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    {selectedRow.processingStatus === 'processing' && (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Processing document...</span>
+                      </>
+                    )}
+                    {selectedRow.processingStatus === 'pending' && (
+                      <>
+                        <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
+                        <span>Waiting to process...</span>
+                      </>
+                    )}
+                    {selectedRow.processingStatus === 'error' && (
+                      <>
+                        <AlertCircle className="w-4 h-4" />
+                        <span>{selectedRow.errorMessage || 'Processing failed'}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Document Content */}
+                <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+                  {decodedMarkdown ? (
+                    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 min-h-[400px]">
+                      <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800 font-mono">
+                        {decodedMarkdown}
+                      </pre>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                      <FileText className="w-12 h-12 text-slate-200 mb-4" />
+                      <p className="text-sm text-slate-500 mb-2">No content available</p>
+                      <p className="text-xs text-slate-400">
+                        {selectedRow.processingStatus === 'error' 
+                          ? 'Document processing failed' 
+                          : 'Document is still being processed'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Add/Edit Column Menu */}

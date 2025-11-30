@@ -45,6 +45,13 @@ export type CellOpts =
       maxFiles?: number;
       accept?: string;
       multiple?: boolean;
+    }
+  | {
+      variant: "auto"; // Auto-detects between file and text based on cell value
+      maxFileSize?: number;
+      maxFiles?: number;
+      accept?: string;
+      multiple?: boolean;
     };
 
 export interface UpdateCell {
@@ -123,6 +130,12 @@ declare module "@tanstack/react-table" {
       columnId: string;
       row: TData;
     }) => void | Promise<void>;
+    onViewFile?: (params: {
+      file: FileCellData;
+      rowIndex: number;
+      columnId: string;
+      row: TData;
+    }) => void;
     contextMenu?: ContextMenuState;
     onContextMenuOpenChange?: (open: boolean) => void;
     pasteDialog?: PasteDialogState;
