@@ -1,7 +1,7 @@
 "use client";
 
 import type { Table, TableMeta } from "@tanstack/react-table";
-import { CopyIcon, EraserIcon, ScissorsIcon, Trash2Icon, Clipboard } from "lucide-react";
+import { CopyIcon, EraserIcon, ScissorsIcon, Trash2Icon, Clipboard, Eye } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import {

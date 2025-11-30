@@ -136,6 +136,10 @@ declare module "@tanstack/react-table" {
       columnId: string;
       row: TData;
     }) => void;
+    onViewCellDetails?: (params: {
+      rowIndex: number;
+      columnId: string;
+    }) => void;
     contextMenu?: ContextMenuState;
     onContextMenuOpenChange?: (open: boolean) => void;
     pasteDialog?: PasteDialogState;

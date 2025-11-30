@@ -9,7 +9,7 @@ import { useDataGrid } from "@/hooks/use-data-grid";
 import { AddColumnMenu } from "@/components/AddColumnMenu";
 import type { ColumnType } from "@/types";
 import type { FileCellData } from "@/types/data-grid";
-import { Table, ChevronDown, Square, Play, Zap, Cpu, Brain, Download, Upload, Loader2, AlertCircle, CheckCircle2, X, FileText, Eye } from "@/components/Icons";
+import { Table, ChevronDown, ChevronLeft, ChevronRight, Square, Play, Zap, Cpu, Brain, Download, Upload, Loader2, AlertCircle, CheckCircle2, X, FileText, Eye } from "@/components/Icons";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { processDocumentFiles } from "@/services/documentProcessingService";
 
@@ -55,8 +55,13 @@ export function DataGridDemo() {
     content: { type: 'short-text', prompt: '' }, // Content column is editable via column menu
   });
   
-  // Document Viewer Sidebar State
+  // Sidebar State
+  type SidebarMode = 'none' | 'document' | 'cell';
+  const [sidebarMode, setSidebarMode] = React.useState<SidebarMode>('none');
   const [selectedRowId, setSelectedRowId] = React.useState<string | null>(null);
+  const [selectedCell, setSelectedCell] = React.useState<{ rowIndex: number; columnId: string } | null>(null);
+  const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(false);
+  
   const selectedRow = React.useMemo(() => data.find(r => r.id === selectedRowId), [data, selectedRowId]);
   
   const currentModel = MODELS.find(m => m.id === selectedModel) || MODELS[0];
@@ -70,6 +75,25 @@ export function DataGridDemo() {
       return selectedRow.processedContent;
     }
   }, [selectedRow?.processedContent]);
+  
+  // Get selected cell data for cell review mode
+  const selectedCellData = React.useMemo(() => {
+    if (!selectedCell) return null;
+    const row = data[selectedCell.rowIndex];
+    if (!row) return null;
+    
+    const value = row[selectedCell.columnId];
+    const columnMeta = columnMetadata[selectedCell.columnId];
+    const column = columns.find(c => c.id === selectedCell.columnId);
+    
+    return {
+      value: value ?? '',
+      prompt: columnMeta?.prompt ?? '',
+      columnName: typeof column?.header === 'string' ? column.header : selectedCell.columnId,
+      sourceFileName: row.content?.[0]?.name ?? 'Unknown',
+      rowData: row,
+    };
+  }, [selectedCell, data, columnMetadata, columns]);
 
   const defaultColumns = React.useMemo<ColumnDef<Record<string, any>>[]>(
     () => [
@@ -328,8 +352,37 @@ export function DataGridDemo() {
     const row = data[rowIndex];
     if (row?.id) {
       setSelectedRowId(row.id);
+      setSelectedCell(null);
+      setSidebarMode('document');
+      setIsSidebarExpanded(false);
     }
   }, [data]);
+
+  // Handle result cell click to open cell review sidebar
+  const handleResultCellClick = React.useCallback((rowIndex: number, columnId: string) => {
+    // Don't open for content column - that uses handleViewFile
+    if (columnId === 'content') return;
+    
+    const row = data[rowIndex];
+    if (!row) return;
+    
+    // Only open if the cell has a value
+    const cellValue = row[columnId];
+    if (cellValue === undefined || cellValue === null || cellValue === '') return;
+    
+    setSelectedCell({ rowIndex, columnId });
+    setSelectedRowId(row.id);
+    setSidebarMode('cell');
+    setIsSidebarExpanded(false);
+  }, [data]);
+
+  // Close sidebar
+  const handleCloseSidebar = React.useCallback(() => {
+    setSidebarMode('none');
+    setSelectedRowId(null);
+    setSelectedCell(null);
+    setIsSidebarExpanded(false);
+  }, []);
 
   const onRowsDelete = React.useCallback(async (rows: RowData[], rowIndices: number[]) => {
     // Remove deleted rows from data
@@ -443,6 +496,7 @@ export function DataGridDemo() {
     meta: {
       onColumnEdit: handleColumnEdit,
       onViewFile: handleViewFile,
+      onResultCellClick: handleResultCellClick,
     } as any,
   });
 
@@ -706,7 +760,18 @@ export function DataGridDemo() {
               });
 
               // Add rows immediately so user sees them
-              setData((prev) => [...prev, ...initialRows]);
+              // If there's only empty rows (no content), replace them instead of appending
+              setData((prev) => {
+                const hasOnlyEmptyRows = prev.every(row => {
+                  const content = row.content;
+                  // Empty if: undefined, null, empty string, or empty array
+                  return !content || content === '' || (Array.isArray(content) && content.length === 0);
+                });
+                if (hasOnlyEmptyRows) {
+                  return initialRows;
+                }
+                return [...prev, ...initialRows];
+              });
 
               // Process each file individually for real-time updates
               for (let i = 0; i < files.length; i++) {
@@ -786,7 +851,7 @@ export function DataGridDemo() {
               </div>
             )}
             <div className="p-8">
-              <div className={`transition-all duration-300 ${selectedRowId ? 'max-w-5xl' : 'max-w-7xl'} mx-auto`}>
+              <div className={`transition-all duration-300 ${sidebarMode !== 'none' ? (isSidebarExpanded ? 'max-w-4xl' : 'max-w-5xl') : 'max-w-7xl'} mx-auto`}>
                 <DataGrid
                   {...dataGridProps}
                   height={600}
@@ -796,85 +861,167 @@ export function DataGridDemo() {
             </div>
           </div>
 
-          {/* Document Viewer Sidebar */}
+          {/* Review Sidebar - Document or Cell mode */}
           <div 
-            className={`transition-all duration-300 ease-in-out border-l border-slate-200 bg-white shadow-xl relative flex flex-col ${
-              selectedRowId ? 'w-[500px] translate-x-0' : 'w-0 translate-x-10 opacity-0 overflow-hidden'
+            className={`transition-all duration-300 ease-in-out border-l border-slate-200 bg-white shadow-xl relative flex ${
+              sidebarMode !== 'none' 
+                ? isSidebarExpanded ? 'w-[900px] translate-x-0' : 'w-[400px] translate-x-0'
+                : 'w-0 translate-x-10 opacity-0 overflow-hidden'
             }`}
           >
-            {selectedRow && (
-              <div className="w-full h-full flex flex-col">
-                {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white flex-shrink-0">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                      <FileText className="w-5 h-5" />
+            {sidebarMode !== 'none' && (
+              <div className="w-full h-full flex">
+                {/* Left Panel - Answer/Info */}
+                <div className={`${isSidebarExpanded ? 'w-[400px] border-r border-slate-200' : 'w-full'} flex-shrink-0 flex flex-col bg-white`}>
+                  {/* Header */}
+                  <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${sidebarMode === 'cell' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                        {sidebarMode === 'cell' ? <Eye className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                          {sidebarMode === 'cell' ? 'Cell Review' : 'Document Preview'}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900 truncate max-w-[200px]" title={
+                          sidebarMode === 'cell' ? selectedCellData?.columnName : selectedRow?.content?.[0]?.name
+                        }>
+                          {sidebarMode === 'cell' ? selectedCellData?.columnName : (selectedRow?.content?.[0]?.name || 'Untitled')}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
-                        Document Preview
-                      </span>
-                      <span className="text-sm font-semibold text-slate-900 truncate max-w-[280px]" title={selectedRow.content?.[0]?.name}>
-                        {selectedRow.content?.[0]?.name || 'Untitled'}
-                      </span>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                        title={isSidebarExpanded ? 'Collapse' : 'Expand to show document'}
+                      >
+                        {isSidebarExpanded ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                      </button>
+                      <button 
+                        onClick={handleCloseSidebar}
+                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => setSelectedRowId(null)} 
-                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+
+                  {/* Body Content */}
+                  {sidebarMode === 'cell' && selectedCellData ? (
+                    <div className="flex-1 overflow-y-auto p-6">
+                      {/* Source File */}
+                      <div className="mb-6">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Source Document</h4>
+                        <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                          <FileText className="w-4 h-4 text-slate-400" />
+                          <span className="text-sm text-slate-700 truncate">{selectedCellData.sourceFileName}</span>
+                        </div>
+                      </div>
+
+                      {/* Extracted Value */}
+                      <div className="mb-6">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Extracted Value</h4>
+                        <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
+                          <p className="text-lg text-slate-900 leading-relaxed font-medium whitespace-pre-wrap">
+                            {selectedCellData.value || <span className="text-slate-400 italic">No value</span>}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Prompt Used */}
+                      {selectedCellData.prompt && (
+                        <div className="mb-6">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Extraction Prompt</h4>
+                          <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <p className="text-sm text-slate-600 leading-relaxed">
+                              {selectedCellData.prompt}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* View Document Button (when collapsed) */}
+                      {!isSidebarExpanded && decodedMarkdown && (
+                        <button
+                          onClick={() => setIsSidebarExpanded(true)}
+                          className="w-full py-3 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View Source Document
+                        </button>
+                      )}
+                    </div>
+                  ) : sidebarMode === 'document' && selectedRow ? (
+                    <div className="flex-1 overflow-y-auto p-6">
+                      {/* Status Badge */}
+                      {selectedRow.processingStatus && selectedRow.processingStatus !== 'completed' && (
+                        <div className={`mb-4 px-3 py-2 rounded-lg flex items-center gap-2 text-sm ${
+                          selectedRow.processingStatus === 'processing' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                          selectedRow.processingStatus === 'pending' ? 'bg-slate-50 text-slate-600 border border-slate-200' :
+                          'bg-red-50 text-red-700 border border-red-200'
+                        }`}>
+                          {selectedRow.processingStatus === 'processing' && (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Processing document...</span>
+                            </>
+                          )}
+                          {selectedRow.processingStatus === 'pending' && (
+                            <>
+                              <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
+                              <span>Waiting to process...</span>
+                            </>
+                          )}
+                          {selectedRow.processingStatus === 'error' && (
+                            <>
+                              <AlertCircle className="w-4 h-4" />
+                              <span>{selectedRow.errorMessage || 'Processing failed'}</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Document Content (when not expanded) */}
+                      {!isSidebarExpanded && (
+                        <>
+                          {decodedMarkdown ? (
+                            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+                              <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800 font-mono">
+                                {decodedMarkdown}
+                              </pre>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <FileText className="w-12 h-12 text-slate-200 mb-4" />
+                              <p className="text-sm text-slate-500 mb-2">No content available</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
 
-                {/* Status Badge */}
-                {selectedRow.processingStatus && selectedRow.processingStatus !== 'completed' && (
-                  <div className={`mx-4 mt-4 px-3 py-2 rounded-lg flex items-center gap-2 text-sm ${
-                    selectedRow.processingStatus === 'processing' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                    selectedRow.processingStatus === 'pending' ? 'bg-slate-50 text-slate-600 border border-slate-200' :
-                    'bg-red-50 text-red-700 border border-red-200'
-                  }`}>
-                    {selectedRow.processingStatus === 'processing' && (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Processing document...</span>
-                      </>
-                    )}
-                    {selectedRow.processingStatus === 'pending' && (
-                      <>
-                        <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
-                        <span>Waiting to process...</span>
-                      </>
-                    )}
-                    {selectedRow.processingStatus === 'error' && (
-                      <>
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{selectedRow.errorMessage || 'Processing failed'}</span>
-                      </>
-                    )}
+                {/* Right Panel - Full Document (when expanded) */}
+                {isSidebarExpanded && (
+                  <div className="flex-1 bg-slate-100 flex flex-col overflow-y-auto">
+                    <div className="p-8">
+                      <div className="max-w-[600px] mx-auto bg-white shadow-lg p-8">
+                        {decodedMarkdown ? (
+                          <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800 font-mono">
+                            {decodedMarkdown}
+                          </pre>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <FileText className="w-12 h-12 text-slate-200 mb-4" />
+                            <p className="text-sm text-slate-500">No document content available</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
-
-                {/* Document Content */}
-                <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
-                  {decodedMarkdown ? (
-                    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 min-h-[400px]">
-                      <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800 font-mono">
-                        {decodedMarkdown}
-                      </pre>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                      <FileText className="w-12 h-12 text-slate-200 mb-4" />
-                      <p className="text-sm text-slate-500 mb-2">No content available</p>
-                      <p className="text-xs text-slate-400">
-                        {selectedRow.processingStatus === 'error' 
-                          ? 'Document processing failed' 
-                          : 'Document is still being processed'}
-                      </p>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </div>
