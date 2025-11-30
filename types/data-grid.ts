@@ -110,6 +110,7 @@ declare module "@tanstack/react-table" {
     }) => void;
     onCellsCopy?: () => void;
     onCellsCut?: () => void;
+    onCellsPaste?: () => void | Promise<void>;
     onFilesUpload?: (params: {
       files: File[];
       rowIndex: number;

@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import * as React from "react";
 import { DataGridColumnHeader } from "@/components/data-grid/data-grid-column-header";
 import { DataGridContextMenu } from "@/components/data-grid/data-grid-context-menu";
+import { DataGridKeyboardShortcuts } from "@/components/data-grid/data-grid-keyboard-shortcuts";
 import { DataGridPasteDialog } from "@/components/data-grid/data-grid-paste-dialog";
 import { DataGridRow } from "@/components/data-grid/data-grid-row";
 import { DataGridSearch } from "@/components/data-grid/data-grid-search";
@@ -53,6 +54,8 @@ export function DataGrid<TData>({
     [],
   );
 
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = React.useState(false);
+
   const onAddRowKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (!onRowAdd) return;
@@ -65,6 +68,32 @@ export function DataGrid<TData>({
     [onRowAdd],
   );
 
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Open keyboard shortcuts with ? or Ctrl+/
+      if (
+        event.key === "?" ||
+        ((event.ctrlKey || event.metaKey) && event.key === "/")
+      ) {
+        // Don't trigger if user is typing in an input
+        const target = event.target;
+        if (
+          target instanceof HTMLElement &&
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.isContentEditable)
+        ) {
+          return;
+        }
+        event.preventDefault();
+        setKeyboardShortcutsOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <div
       data-slot="grid-wrapper"
@@ -75,6 +104,10 @@ export function DataGrid<TData>({
       {searchState && <DataGridSearch {...searchState} />}
       <DataGridContextMenu table={table} />
       <DataGridPasteDialog table={table} />
+      <DataGridKeyboardShortcuts
+        open={keyboardShortcutsOpen}
+        onOpenChange={setKeyboardShortcutsOpen}
+      />
       <div
         role="grid"
         aria-label="Data grid"

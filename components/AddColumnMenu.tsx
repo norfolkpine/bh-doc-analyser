@@ -13,7 +13,8 @@ import {
   Calendar,
   CheckSquare,
   List,
-  Trash2
+  Trash2,
+  FileText
 } from './Icons';
 import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
@@ -25,6 +26,7 @@ const COLUMN_TYPES: { type: ColumnType; label: string; icon: React.FC<any> }[] =
   { type: 'date', label: 'Date', icon: Calendar },
   { type: 'boolean', label: 'Yes/No', icon: CheckSquare },
   { type: 'list', label: 'List', icon: List },
+  { type: 'file', label: 'File', icon: FileText },
 ];
 
 interface AddColumnMenuProps {

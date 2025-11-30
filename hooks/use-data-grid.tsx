@@ -2003,6 +2003,7 @@ function useDataGrid<TData>({
         onCellEditingStop,
         onCellsCopy,
         onCellsCut,
+        onCellsPaste: enablePaste ? onCellsPaste : undefined,
         onFilesUpload: propsRef.current.onFilesUpload
           ? propsRef.current.onFilesUpload
           : undefined,
@@ -2053,6 +2054,7 @@ function useDataGrid<TData>({
       onCellEditingStop,
       onCellsCopy,
       onCellsCut,
+      onCellsPaste,
       contextMenu,
       onContextMenuOpenChange,
       pasteDialog,

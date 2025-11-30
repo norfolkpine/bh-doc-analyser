@@ -109,6 +109,9 @@ export const extractColumnData = async (
         case 'list':
             formatInstruction = "Return the items as a comma-separated string.";
             break;
+        case 'file':
+            formatInstruction = "Note: Files should be uploaded manually. This column is for file attachments.";
+            break;
         default:
             formatInstruction = "Keep the text concise.";
       }

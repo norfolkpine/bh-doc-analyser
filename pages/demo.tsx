@@ -76,6 +76,7 @@ export function DataGridDemo() {
       'date': 'date',
       'boolean': 'checkbox',
       'list': 'long-text',
+      'file': 'file',
     };
 
     const newColumn: ColumnDef<Record<string, any>> = {
@@ -83,9 +84,16 @@ export function DataGridDemo() {
       accessorKey: columnId as any,
       header: colDef.name,
       meta: {
-        cell: {
-          variant: variantMap[colDef.type] as any,
-        },
+        cell: colDef.type === 'file' 
+          ? {
+              variant: "file" as const,
+              multiple: true,
+              maxFiles: 10,
+              maxFileSize: 10 * 1024 * 1024, // 10MB
+            }
+          : {
+              variant: variantMap[colDef.type] as any,
+            },
       },
       size: COLUMN_SIZE.DEFAULT,
       minSize: COLUMN_SIZE.MIN,
@@ -270,6 +278,7 @@ export function DataGridDemo() {
     onDataChange: setData,
     onRowAdd,
     enableSearch: true,
+    enablePaste: true,
     meta: {
       onColumnEdit: handleColumnEdit,
     } as any,
