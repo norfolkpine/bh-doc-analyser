@@ -49,7 +49,7 @@ export function DataGridDemo() {
   const [projectName, setProjectName] = React.useState('Data Grid Demo');
   const [isEditingProjectName, setIsEditingProjectName] = React.useState(false);
   const [isDraggingOver, setIsDraggingOver] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState<string>("files");
+  const [activeTab, setActiveTab] = React.useState<string>("analyse");
   
   // Model State
   const [selectedModel, setSelectedModel] = React.useState<string>(MODELS[0].id);
@@ -736,17 +736,29 @@ export function DataGridDemo() {
           </div>
         </header>
         {/* Tabs */}
-        <div className="bg-white border-b border-slate-200 px-6 py-3 flex justify-center">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-md">
-            <TabsList className="w-full grid grid-cols-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <div className="bg-white border-b border-slate-200 px-6 py-3 flex justify-center">
+            <TabsList className="w-full max-w-md grid grid-cols-3">
               <TabsTrigger value="files">Files</TabsTrigger>
               <TabsTrigger value="analyse">Analyse</TabsTrigger>
               <TabsTrigger value="workflow">Workflow</TabsTrigger>
             </TabsList>
-          </Tabs>
-        </div>
-        {/* Workspace */}
-        <main className="flex-1 flex overflow-hidden relative">
+          </div>
+          
+          {/* Files Tab */}
+          <TabsContent value="files" className="flex-1 flex overflow-hidden m-0">
+            <div className="flex-1 flex items-center justify-center bg-slate-50">
+              <div className="text-center">
+                <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-600 mb-2">Files Management</h3>
+                <p className="text-sm text-slate-400">Upload and manage your documents here</p>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Analyse Tab - DataGrid */}
+          <TabsContent value="analyse" className="flex-1 flex overflow-hidden m-0">
+            <main className="flex-1 flex overflow-hidden relative">
           <div 
             className={`flex-1 flex flex-col min-w-0 bg-white relative ${isDraggingOver ? 'bg-indigo-50/30' : ''}`}
             onDragOver={(e) => {
@@ -1157,7 +1169,20 @@ export function DataGridDemo() {
               } : undefined}
             />
           )}
-        </main>
+            </main>
+          </TabsContent>
+
+          {/* Workflow Tab */}
+          <TabsContent value="workflow" className="flex-1 flex overflow-hidden m-0">
+            <div className="flex-1 flex items-center justify-center bg-slate-50">
+              <div className="text-center">
+                <Zap className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-600 mb-2">Workflow Builder</h3>
+                <p className="text-sm text-slate-400">Create automated document processing workflows</p>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
