@@ -973,7 +973,7 @@ export function DataGridDemo() {
                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Source Document</h4>
                         <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100">
                           <FileText className="w-4 h-4 text-slate-400" />
-                          <span className="text-sm text-slate-700 truncate">{selectedCellData.sourceFileName}</span>
+                          <span className="text-sm text-slate-700 truncate" title={selectedCellData.sourceFileName}>{selectedCellData.sourceFileName}</span>
                         </div>
                       </div>
 

@@ -1966,7 +1966,7 @@ export function FileCell<TData>({
                 {React.createElement(getFileIcon(file.type), {
                   className: "size-3 shrink-0",
                 })}
-                <span className="max-w-[100px] truncate">{file.name}</span>
+                <span className="max-w-[100px] truncate" title={file.name}>{file.name}</span>
                 <div className="flex items-center gap-0.5 ml-0.5">
                   {meta?.onViewFile && (
                     <button
