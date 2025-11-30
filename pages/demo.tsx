@@ -285,6 +285,16 @@ export function DataGridDemo() {
 
         if (!metadata?.prompt) continue;
 
+        // Set loading indicator before processing
+        setData(prevData => {
+          const newData = [...prevData];
+          newData[rowIndex] = {
+            ...newData[rowIndex],
+            [columnId]: '__LOADING__'
+          };
+          return newData;
+        });
+
         // Create a Column object for extractColumnData
         const columnForExtraction = {
           id: columnId,
@@ -322,12 +332,12 @@ export function DataGridDemo() {
           });
         } catch (error) {
           console.error(`Failed to process row ${rowIndex}, column ${columnId}:`, error);
-          // On error, keep the cell empty or show error
+          // On error, clear the loading indicator
           setData(prevData => {
             const newData = [...prevData];
             newData[rowIndex] = {
               ...newData[rowIndex],
-              [columnId]: '[Error]'
+              [columnId]: ''
             };
             return newData;
           });
@@ -905,6 +915,18 @@ export function DataGridDemo() {
                 <div>
                   <p className="text-sm font-semibold text-slate-800">Processing Documents</p>
                   <p className="text-xs text-slate-500">Converting files to markdown...</p>
+                </div>
+              </div>
+            )}
+            {/* Analysis Progress Overlay */}
+            {isProcessing && !isConverting && (
+              <div className="absolute bottom-4 right-4 z-50 bg-white rounded-xl shadow-xl border border-emerald-100 p-4 flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-200">
+                <div className="bg-emerald-50 p-2 rounded-lg">
+                  <Loader2 className="w-5 h-5 text-emerald-600 animate-spin" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Running Analysis</p>
+                  <p className="text-xs text-slate-500">Extracting data from documents...</p>
                 </div>
               </div>
             )}

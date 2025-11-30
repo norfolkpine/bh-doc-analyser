@@ -162,6 +162,7 @@ export function ShortTextCell<TData>({
   }, [isEditing, value]);
 
   const displayValue = !isEditing ? (value ?? "") : "";
+  const isLoading = value === '__LOADING__';
 
   return (
     <DataGridCellWrapper
@@ -175,22 +176,29 @@ export function ShortTextCell<TData>({
       isSelected={isSelected}
       onKeyDown={onWrapperKeyDown}
     >
-      <div
-        role="textbox"
-        data-slot="grid-cell-content"
-        contentEditable={isEditing}
-        tabIndex={-1}
-        ref={cellRef}
-        onBlur={onBlur}
-        onInput={onInput}
-        suppressContentEditableWarning
-        className={cn("size-full overflow-hidden outline-none", {
-          "whitespace-nowrap **:inline **:whitespace-nowrap [&_br]:hidden":
-            isEditing,
-        })}
-      >
-        {displayValue}
-      </div>
+      {isLoading ? (
+        <div className="flex items-center gap-2 opacity-50">
+          <div className="w-4 h-1 bg-slate-200 rounded animate-pulse"></div>
+          <div className="w-8 h-1 bg-slate-200 rounded animate-pulse"></div>
+        </div>
+      ) : (
+        <div
+          role="textbox"
+          data-slot="grid-cell-content"
+          contentEditable={isEditing}
+          tabIndex={-1}
+          ref={cellRef}
+          onBlur={onBlur}
+          onInput={onInput}
+          suppressContentEditableWarning
+          className={cn("size-full overflow-hidden outline-none", {
+            "whitespace-nowrap **:inline **:whitespace-nowrap [&_br]:hidden":
+              isEditing,
+          })}
+        >
+          {displayValue}
+        </div>
+      )}
     </DataGridCellWrapper>
   );
 }
@@ -311,6 +319,8 @@ export function LongTextCell<TData>({
     [onSave, onCancel, value, initialValue, meta, rowIndex, columnId],
   );
 
+  const isLoading = value === '__LOADING__';
+
   return (
     <Popover open={isEditing} onOpenChange={onOpenChange}>
       <PopoverAnchor asChild>
@@ -324,7 +334,14 @@ export function LongTextCell<TData>({
           isFocused={isFocused}
           isSelected={isSelected}
         >
-          <span data-slot="grid-cell-content">{value}</span>
+          {isLoading ? (
+            <div className="flex items-center gap-2 opacity-50">
+              <div className="w-4 h-1 bg-slate-200 rounded animate-pulse"></div>
+              <div className="w-8 h-1 bg-slate-200 rounded animate-pulse"></div>
+            </div>
+          ) : (
+            <span data-slot="grid-cell-content">{value}</span>
+          )}
         </DataGridCellWrapper>
       </PopoverAnchor>
       <PopoverContent
@@ -434,6 +451,8 @@ export function NumberCell<TData>({
     }
   }, [isEditing]);
 
+  const isLoading = value === '__LOADING__';
+
   return (
     <DataGridCellWrapper
       ref={containerRef}
@@ -446,7 +465,12 @@ export function NumberCell<TData>({
       isSelected={isSelected}
       onKeyDown={onWrapperKeyDown}
     >
-      {isEditing ? (
+      {isLoading ? (
+        <div className="flex items-center gap-2 opacity-50">
+          <div className="w-4 h-1 bg-slate-200 rounded animate-pulse"></div>
+          <div className="w-8 h-1 bg-slate-200 rounded animate-pulse"></div>
+        </div>
+      ) : isEditing ? (
         <input
           ref={inputRef}
           type="number"
@@ -1248,6 +1272,8 @@ export function DateCell<TData>({
     [isEditing, isFocused, initialValue, meta],
   );
 
+  const isLoading = value === '__LOADING__';
+
   return (
     <DataGridCellWrapper
       ref={containerRef}
@@ -1260,30 +1286,37 @@ export function DateCell<TData>({
       isSelected={isSelected}
       onKeyDown={onWrapperKeyDown}
     >
-      <Popover open={isEditing} onOpenChange={onOpenChange}>
-        <PopoverAnchor asChild>
-          <span data-slot="grid-cell-content">
-            {formatDateForDisplay(value)}
-          </span>
-        </PopoverAnchor>
-        {isEditing && (
-          <PopoverContent
-            data-grid-cell-editor=""
-            align="start"
-            alignOffset={-8}
-            className="w-auto p-0"
-          >
-            <Calendar
-              autoFocus
-              captionLayout="dropdown"
-              mode="single"
-              defaultMonth={selectedDate ?? new Date()}
-              selected={selectedDate}
-              onSelect={onDateSelect}
-            />
-          </PopoverContent>
-        )}
-      </Popover>
+      {isLoading ? (
+        <div className="flex items-center gap-2 opacity-50">
+          <div className="w-4 h-1 bg-slate-200 rounded animate-pulse"></div>
+          <div className="w-8 h-1 bg-slate-200 rounded animate-pulse"></div>
+        </div>
+      ) : (
+        <Popover open={isEditing} onOpenChange={onOpenChange}>
+          <PopoverAnchor asChild>
+            <span data-slot="grid-cell-content">
+              {formatDateForDisplay(value)}
+            </span>
+          </PopoverAnchor>
+          {isEditing && (
+            <PopoverContent
+              data-grid-cell-editor=""
+              align="start"
+              alignOffset={-8}
+              className="w-auto p-0"
+            >
+              <Calendar
+                autoFocus
+                captionLayout="dropdown"
+                mode="single"
+                defaultMonth={selectedDate ?? new Date()}
+                selected={selectedDate}
+                onSelect={onDateSelect}
+              />
+            </PopoverContent>
+          )}
+        </Popover>
+      )}
     </DataGridCellWrapper>
   );
 }
