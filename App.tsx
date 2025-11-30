@@ -154,6 +154,7 @@ const App: React.FC = () => {
   };
 
   const handleSaveColumn = (colDef: { name: string; type: ColumnType; prompt: string }) => {
+    const promptValue = colDef.prompt || '';
     if (editingColumnId) {
       // Update existing column
       setColumns(prev => prev.map(c => c.id === editingColumnId ? { ...c, ...colDef } : c));
@@ -164,7 +165,7 @@ const App: React.FC = () => {
         id: `col_${Date.now()}`,
         name: colDef.name,
         type: colDef.type,
-        prompt: colDef.prompt,
+        prompt: promptValue,
         status: 'idle',
         width: 250 // Default width
       };
@@ -419,7 +420,7 @@ const App: React.FC = () => {
         {/* Header */}
         <header className="relative z-50 bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shadow-sm">
           <div className="flex items-center gap-4 min-w-0">
-            <h1 className="text-lg font-bold text-slate-800 tracking-tight whitespace-nowrap">Tabular Review</h1>
+            <h1 className="text-lg font-bold text-slate-800 tracking-tight whitespace-nowrap">Document Analysis</h1>
             <div className="h-4 w-px bg-slate-300 mx-2 flex-shrink-0"></div>
             {isEditingProjectName ? (
               <input

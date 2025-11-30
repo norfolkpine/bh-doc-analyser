@@ -67,6 +67,7 @@ export function DataGridDemo() {
   }, [columns.length, defaultColumns]);
 
   const handleSaveColumn = (colDef: { name: string; type: ColumnType; prompt: string }) => {
+    const promptValue = colDef.prompt || '';
     const columnId = editingColumnId || colDef.name.toLowerCase().replace(/\s+/g, '-');
 
     // Map ColumnType to cell variant
@@ -114,7 +115,7 @@ export function DataGridDemo() {
     // Store metadata
     setColumnMetadata({
       ...columnMetadata,
-      [columnId]: { type: colDef.type, prompt: colDef.prompt }
+      [columnId]: { type: colDef.type, prompt: promptValue }
     });
 
     setAddColumnAnchor(null);
@@ -361,7 +362,7 @@ export function DataGridDemo() {
         {/* Header */}
         <header className="relative z-50 bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shadow-sm">
           <div className="flex items-center gap-4 min-w-0">
-            <h1 className="text-lg font-bold text-slate-800 tracking-tight whitespace-nowrap">Tabular Review</h1>
+            <h1 className="text-lg font-bold text-slate-800 tracking-tight whitespace-nowrap">Document Analysis</h1>
             <div className="h-4 w-px bg-slate-300 mx-2 flex-shrink-0"></div>
             {isEditingProjectName ? (
               <input

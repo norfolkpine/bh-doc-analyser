@@ -35,7 +35,7 @@ interface AddColumnMenuProps {
   onSave: (col: { name: string; type: ColumnType; prompt: string }) => void;
   onDelete?: () => void;
   modelId: string;
-  initialData?: { name: string; type: ColumnType; prompt: string };
+  initialData?: { name: string; type: ColumnType; prompt?: string };
 }
 
 export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
@@ -85,7 +85,7 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
   };
 
   const handleSave = () => {
-    if (name && prompt) {
+    if (name) {
       onSave({ name, type, prompt });
     }
   };
@@ -161,7 +161,7 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
             <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
                   <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                  <label className="text-xs font-semibold text-foreground">Prompt</label>
+                  <label className="text-xs font-semibold text-foreground">Prompt (optional)</label>
                 </div>
                 <div className="relative group">
                     <Textarea 
@@ -169,7 +169,7 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
                           "h-[120px] pr-24 resize-none overflow-y-auto",
                           "focus-visible:ring-2"
                         )}
-                        placeholder="Describe what data to extract from the document..."
+                        placeholder="Describe what data to extract from the document... (optional)"
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                     />
@@ -213,7 +213,7 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
              )}
              <button 
                 onClick={handleSave}
-                disabled={!name || !prompt}
+                disabled={!name}
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-xs shadow-lg shadow-slate-900/10 transition-all active:scale-95"
             >
                {initialData ? 'Update Column' : 'Create Column'}
