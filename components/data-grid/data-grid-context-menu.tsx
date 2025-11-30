@@ -31,6 +31,7 @@ export function DataGridContextMenu<TData>({
   const onCellsCopy = meta?.onCellsCopy;
   const onCellsCut = meta?.onCellsCut;
   const onCellsPaste = meta?.onCellsPaste;
+  const onViewCellDetails = meta?.onViewCellDetails;
   const readOnly = meta?.readOnly;
 
   if (!contextMenu) return null;
@@ -47,6 +48,7 @@ export function DataGridContextMenu<TData>({
       onCellsCopy={onCellsCopy}
       onCellsCut={onCellsCut}
       onCellsPaste={onCellsPaste}
+      onViewCellDetails={onViewCellDetails}
       readOnly={readOnly}
     />
   );
@@ -63,6 +65,7 @@ interface ContextMenuProps<TData>
       | "onCellsCopy"
       | "onCellsCut"
       | "onCellsPaste"
+      | "onViewCellDetails"
       | "readOnly"
     >,
     Required<Pick<TableMeta<TData>, "contextMenu">> {
@@ -93,6 +96,7 @@ function ContextMenuImpl<TData>({
   onCellsCopy,
   onCellsCut,
   onCellsPaste,
+  onViewCellDetails,
   readOnly,
 }: ContextMenuProps<TData>) {
   const triggerStyle = React.useMemo<React.CSSProperties>(
@@ -190,6 +194,30 @@ function ContextMenuImpl<TData>({
     toast.success(`${rowCount} row${rowCount !== 1 ? "s" : ""} deleted`);
   }, [onRowsDelete, selectionState]);
 
+  // Get the first selected cell for "View Details"
+  const firstSelectedCell = React.useMemo(() => {
+    if (!selectionState?.selectedCells || selectionState.selectedCells.size === 0) {
+      return null;
+    }
+    const firstCellKey = Array.from(selectionState.selectedCells)[0];
+    if (!firstCellKey) return null;
+    return parseCellKey(firstCellKey);
+  }, [selectionState]);
+
+  const onViewDetails = React.useCallback(() => {
+    if (!firstSelectedCell || !onViewCellDetails) return;
+    onViewCellDetails({
+      rowIndex: firstSelectedCell.rowIndex,
+      columnId: firstSelectedCell.columnId,
+    });
+  }, [firstSelectedCell, onViewCellDetails]);
+
+  // Only show "View Details" for non-content columns with a single cell selected
+  const showViewDetails = onViewCellDetails && 
+    firstSelectedCell && 
+    firstSelectedCell.columnId !== 'content' &&
+    selectionState?.selectedCells?.size === 1;
+
   return (
     <DropdownMenu
       open={contextMenu.open}
@@ -202,6 +230,15 @@ function ContextMenuImpl<TData>({
         className="w-48"
         onCloseAutoFocus={onCloseAutoFocus}
       >
+        {showViewDetails && (
+          <>
+            <DropdownMenuItem onSelect={onViewDetails}>
+              <Eye />
+              View Details
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem onSelect={onCopy}>
           <CopyIcon />
           Copy

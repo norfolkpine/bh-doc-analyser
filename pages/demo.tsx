@@ -7,11 +7,19 @@ import * as React from "react";
 import { DataGrid } from "@/components/data-grid/data-grid";
 import { useDataGrid } from "@/hooks/use-data-grid";
 import { AddColumnMenu } from "@/components/AddColumnMenu";
-import type { ColumnType } from "@/types";
+import type { ColumnType, ExtractionCell } from "@/types";
 import type { FileCellData } from "@/types/data-grid";
-import { Table, ChevronDown, ChevronLeft, ChevronRight, Square, Play, Zap, Cpu, Brain, Download, Upload, Loader2, AlertCircle, CheckCircle2, X, FileText, Eye } from "@/components/Icons";
+import { Table, ChevronDown, ChevronLeft, ChevronRight, Square, Play, Zap, Cpu, Brain, Download, Upload, Loader2, AlertCircle, CheckCircle2, X, FileText, Eye, Quote } from "@/components/Icons";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { processDocumentFiles } from "@/services/documentProcessingService";
+import { extractColumnData } from "@/services/geminiService";
+
+// Analysis results with quotes and reasoning
+type AnalysisResults = {
+  [rowId: string]: {
+    [columnId: string]: ExtractionCell;
+  };
+};
 
 // Processing status for each row
 type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'error';
@@ -62,7 +70,44 @@ export function DataGridDemo() {
   const [selectedCell, setSelectedCell] = React.useState<{ rowIndex: number; columnId: string } | null>(null);
   const [isSidebarExpanded, setIsSidebarExpanded] = React.useState(false);
   
+  // Analysis results with quotes and reasoning
+  const [analysisResults, setAnalysisResults] = React.useState<AnalysisResults>({});
+  
   const selectedRow = React.useMemo(() => data.find(r => r.id === selectedRowId), [data, selectedRowId]);
+  
+  // Get the ExtractionCell for the selected cell with additional context
+  const selectedCellData = React.useMemo(() => {
+    if (!selectedCell || !selectedRowId || !selectedRow) return null;
+    
+    const extractionCell = analysisResults[selectedRowId]?.[selectedCell.columnId];
+    const metadata = columnMetadata[selectedCell.columnId];
+    const column = columns.find(c => c.id === selectedCell.columnId);
+    
+    // Get source file name from the row's content
+    const sourceFileName = Array.isArray(selectedRow.content) && selectedRow.content[0] 
+      ? selectedRow.content[0].name 
+      : 'Unknown document';
+    
+    // Get column name from the column definition
+    const columnName = column && typeof column.header === 'string' 
+      ? column.header 
+      : selectedCell.columnId;
+    
+    return {
+      // ExtractionCell fields
+      value: extractionCell?.value || (selectedRow[selectedCell.columnId] as string) || '',
+      confidence: extractionCell?.confidence || 'Medium',
+      quote: extractionCell?.quote || '',
+      page: extractionCell?.page || 1,
+      reasoning: extractionCell?.reasoning || '',
+      status: extractionCell?.status || 'needs_review',
+      // Additional context
+      columnName,
+      sourceFileName,
+      prompt: metadata?.prompt || '',
+      columnId: selectedCell.columnId,
+    };
+  }, [selectedCell, selectedRowId, selectedRow, analysisResults, columnMetadata, columns]);
   
   const currentModel = MODELS.find(m => m.id === selectedModel) || MODELS[0];
   
@@ -75,25 +120,6 @@ export function DataGridDemo() {
       return selectedRow.processedContent;
     }
   }, [selectedRow?.processedContent]);
-  
-  // Get selected cell data for cell review mode
-  const selectedCellData = React.useMemo(() => {
-    if (!selectedCell) return null;
-    const row = data[selectedCell.rowIndex];
-    if (!row) return null;
-    
-    const value = row[selectedCell.columnId];
-    const columnMeta = columnMetadata[selectedCell.columnId];
-    const column = columns.find(c => c.id === selectedCell.columnId);
-    
-    return {
-      value: value ?? '',
-      prompt: columnMeta?.prompt ?? '',
-      columnName: typeof column?.header === 'string' ? column.header : selectedCell.columnId,
-      sourceFileName: row.content?.[0]?.name ?? 'Unknown',
-      rowData: row,
-    };
-  }, [selectedCell, data, columnMetadata, columns]);
 
   const defaultColumns = React.useMemo<ColumnDef<Record<string, any>>[]>(
     () => [
@@ -232,23 +258,20 @@ export function DataGridDemo() {
         continue;
       }
 
-      // Use processed content if available, otherwise fall back to file names
-      let contentToProcess: string;
-      if (row.processedContent) {
-        // Decode base64 content to get the actual markdown
-        try {
-          contentToProcess = decodeURIComponent(escape(atob(row.processedContent)));
-        } catch {
-          // If decoding fails, use as-is
-          contentToProcess = row.processedContent;
-        }
-      } else if (row.content && Array.isArray(row.content) && row.content.length > 0) {
-        // Fallback: use file names if no processed content
-        contentToProcess = row.content.map((f: FileCellData) => f.name).join(', ');
-      } else {
-        // Skip if no content at all
+      // Skip if no processed content
+      if (!row.processedContent) {
         continue;
       }
+
+      // Create a DocumentFile-like object for extractColumnData
+      const documentFile = {
+        id: row.id,
+        name: Array.isArray(row.content) && row.content[0] ? row.content[0].name : 'document',
+        type: 'text/markdown',
+        size: row.processedContent.length,
+        content: row.processedContent, // Already base64
+        mimeType: 'text/markdown',
+      };
 
       // Process each column for this row
       for (const column of processingColumns) {
@@ -262,20 +285,38 @@ export function DataGridDemo() {
 
         if (!metadata?.prompt) continue;
 
+        // Create a Column object for extractColumnData
+        const columnForExtraction = {
+          id: columnId,
+          name: typeof column.header === 'string' ? column.header : columnId,
+          type: metadata.type,
+          prompt: metadata.prompt,
+          status: 'extracting' as const,
+        };
+
         try {
-          // Call AI API to process the content with the prompt
-          const result = await callAI(
-            contentToProcess,
-            metadata.prompt,
+          // Call extractColumnData to get structured result with quote
+          const extractionResult = await extractColumnData(
+            documentFile,
+            columnForExtraction,
             selectedModel
           );
 
-          // Update the cell
+          // Store the full extraction result for the sidebar
+          setAnalysisResults(prev => ({
+            ...prev,
+            [row.id]: {
+              ...prev[row.id],
+              [columnId]: extractionResult
+            }
+          }));
+
+          // Update the cell value in the data grid
           setData(prevData => {
             const newData = [...prevData];
             newData[rowIndex] = {
               ...newData[rowIndex],
-              [columnId]: result
+              [columnId]: extractionResult.value
             };
             return newData;
           });
@@ -483,6 +524,11 @@ export function DataGridDemo() {
     }
   }, []);
 
+  // Handle view cell details from context menu
+  const handleViewCellDetails = React.useCallback(({ rowIndex, columnId }: { rowIndex: number; columnId: string }) => {
+    handleResultCellClick(rowIndex, columnId);
+  }, [handleResultCellClick]);
+
   const dataGridProps = useDataGrid({
     columns,
     data,
@@ -496,7 +542,7 @@ export function DataGridDemo() {
     meta: {
       onColumnEdit: handleColumnEdit,
       onViewFile: handleViewFile,
-      onResultCellClick: handleResultCellClick,
+      onViewCellDetails: handleViewCellDetails,
     } as any,
   });
 
@@ -919,15 +965,56 @@ export function DataGridDemo() {
                         </div>
                       </div>
 
-                      {/* Extracted Value */}
+                      {/* Extracted Value with Confidence */}
                       <div className="mb-6">
-                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Extracted Value</h4>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Extracted Value</h4>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            selectedCellData.confidence === 'High' ? 'bg-emerald-100 text-emerald-700' :
+                            selectedCellData.confidence === 'Medium' ? 'bg-amber-100 text-amber-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {selectedCellData.confidence} Confidence
+                          </span>
+                        </div>
                         <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm">
                           <p className="text-lg text-slate-900 leading-relaxed font-medium whitespace-pre-wrap">
                             {selectedCellData.value || <span className="text-slate-400 italic">No value</span>}
                           </p>
                         </div>
                       </div>
+
+                      {/* Quote from Document */}
+                      {selectedCellData.quote && (
+                        <div className="mb-6">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                            <span className="flex items-center gap-1">
+                              <Quote className="w-3 h-3" />
+                              Quote from Document
+                            </span>
+                          </h4>
+                          <div className="p-4 bg-amber-50 rounded-lg border-l-4 border-amber-400">
+                            <p className="text-sm text-slate-700 leading-relaxed italic">
+                              "{selectedCellData.quote}"
+                            </p>
+                            {selectedCellData.page > 0 && (
+                              <p className="text-xs text-slate-500 mt-2">Page {selectedCellData.page}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* AI Reasoning */}
+                      {selectedCellData.reasoning && (
+                        <div className="mb-6">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">AI Reasoning</h4>
+                          <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <p className="text-sm text-slate-600 leading-relaxed">
+                              {selectedCellData.reasoning}
+                            </p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Prompt Used */}
                       {selectedCellData.prompt && (
@@ -1010,7 +1097,34 @@ export function DataGridDemo() {
                       <div className="max-w-[600px] mx-auto bg-white shadow-lg p-8">
                         {decodedMarkdown ? (
                           <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800 font-mono">
-                            {decodedMarkdown}
+                            {(() => {
+                              // If we have a quote to highlight (in cell mode), split and highlight
+                              const quoteToHighlight = sidebarMode === 'cell' && selectedCellData?.quote;
+                              if (quoteToHighlight && decodedMarkdown.includes(quoteToHighlight)) {
+                                const parts = decodedMarkdown.split(quoteToHighlight);
+                                return parts.map((part, i) => (
+                                  <React.Fragment key={i}>
+                                    {part}
+                                    {i < parts.length - 1 && (
+                                      <mark 
+                                        className="bg-amber-200 text-slate-900 px-0.5 rounded scroll-mt-32"
+                                        ref={i === 0 ? (el) => {
+                                          // Auto-scroll to first highlighted quote
+                                          if (el) {
+                                            setTimeout(() => {
+                                              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                            }, 100);
+                                          }
+                                        } : undefined}
+                                      >
+                                        {quoteToHighlight}
+                                      </mark>
+                                    )}
+                                  </React.Fragment>
+                                ));
+                              }
+                              return decodedMarkdown;
+                            })()}
                           </pre>
                         ) : (
                           <div className="flex flex-col items-center justify-center py-12 text-center">
