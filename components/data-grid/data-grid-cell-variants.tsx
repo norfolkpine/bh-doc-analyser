@@ -177,9 +177,9 @@ export function ShortTextCell<TData>({
       onKeyDown={onWrapperKeyDown}
     >
       {isLoading ? (
-        <div className="flex items-center gap-2 opacity-50">
-          <div className="w-4 h-1 bg-slate-200 rounded animate-pulse"></div>
-          <div className="w-8 h-1 bg-slate-200 rounded animate-pulse"></div>
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="h-3 w-12 rounded" />
+          <Skeleton className="h-3 w-8 rounded" />
         </div>
       ) : (
         <div
@@ -335,9 +335,9 @@ export function LongTextCell<TData>({
           isSelected={isSelected}
         >
           {isLoading ? (
-            <div className="flex items-center gap-2 opacity-50">
-              <div className="w-4 h-1 bg-slate-200 rounded animate-pulse"></div>
-              <div className="w-8 h-1 bg-slate-200 rounded animate-pulse"></div>
+            <div className="flex items-center gap-1.5">
+              <Skeleton className="h-3 w-12 rounded" />
+              <Skeleton className="h-3 w-8 rounded" />
             </div>
           ) : (
             <span data-slot="grid-cell-content">{value}</span>
@@ -466,9 +466,9 @@ export function NumberCell<TData>({
       onKeyDown={onWrapperKeyDown}
     >
       {isLoading ? (
-        <div className="flex items-center gap-2 opacity-50">
-          <div className="w-4 h-1 bg-slate-200 rounded animate-pulse"></div>
-          <div className="w-8 h-1 bg-slate-200 rounded animate-pulse"></div>
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="h-3 w-12 rounded" />
+          <Skeleton className="h-3 w-8 rounded" />
         </div>
       ) : isEditing ? (
         <input
@@ -1287,9 +1287,9 @@ export function DateCell<TData>({
       onKeyDown={onWrapperKeyDown}
     >
       {isLoading ? (
-        <div className="flex items-center gap-2 opacity-50">
-          <div className="w-4 h-1 bg-slate-200 rounded animate-pulse"></div>
-          <div className="w-8 h-1 bg-slate-200 rounded animate-pulse"></div>
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="h-3 w-12 rounded" />
+          <Skeleton className="h-3 w-8 rounded" />
         </div>
       ) : (
         <Popover open={isEditing} onOpenChange={onOpenChange}>
