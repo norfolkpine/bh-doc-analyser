@@ -9,8 +9,12 @@ import { useDataGrid } from "@/hooks/use-data-grid";
 import { AddColumnMenu } from "@/components/AddColumnMenu";
 import type { ColumnType } from "@/types";
 import type { FileCellData } from "@/types/data-grid";
-import { Table, ChevronDown, Square, Play, Zap, Cpu, Brain, Download, Upload } from "@/components/Icons";
+import { Table, ChevronDown, Square, Play, Zap, Cpu, Brain, Download, Upload, Loader2, AlertCircle, CheckCircle2 } from "@/components/Icons";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { processDocumentFiles } from "@/services/documentProcessingService";
+
+// Processing status for each row
+type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'error';
 
 // Available Models
 const MODELS = [
@@ -20,8 +24,18 @@ const MODELS = [
 ];
 
 
+// Row data interface for type safety
+interface RowData {
+  id: string;
+  content?: FileCellData[];
+  processedContent?: string; // Base64 encoded markdown from document processing
+  processingStatus?: ProcessingStatus;
+  errorMessage?: string;
+  [key: string]: any;
+}
+
 export function DataGridDemo() {
-  const [data, setData] = React.useState<Record<string, any>[]>([{ id: faker.string.nanoid() }]);
+  const [data, setData] = React.useState<RowData[]>([{ id: faker.string.nanoid() }]);
   const [addColumnAnchor, setAddColumnAnchor] = React.useState<DOMRect | null>(null);
   const [editingColumnId, setEditingColumnId] = React.useState<string | null>(null);
   const [projectName, setProjectName] = React.useState('Data Grid Demo');
@@ -33,6 +47,7 @@ export function DataGridDemo() {
   const [selectedModel, setSelectedModel] = React.useState<string>(MODELS[0].id);
   const [isModelMenuOpen, setIsModelMenuOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isConverting, setIsConverting] = React.useState(false);
   const processingAbortRef = React.useRef(false);
 
   const [columns, setColumns] = React.useState<ColumnDef<Record<string, any>>[]>([]);
@@ -151,7 +166,7 @@ export function DataGridDemo() {
     }
   };
 
-  // Process cells using prompts and first column data
+  // Process cells using prompts and processed document content
   const handleRunAnalysis = React.useCallback(async () => {
     processingAbortRef.current = false;
     setIsProcessing(true);
@@ -167,18 +182,28 @@ export function DataGridDemo() {
       }
 
       const row = data[rowIndex];
-      const firstColumnValue = row[columns[0]?.id as string] || row.content;
+      
+      // Skip rows that are still processing or had errors
+      if (row.processingStatus === 'processing' || row.processingStatus === 'pending') {
+        continue;
+      }
 
-      // Skip if first column is empty
-      if (!firstColumnValue) continue;
-
-      // Handle FileCellData[] - extract file names
+      // Use processed content if available, otherwise fall back to file names
       let contentToProcess: string;
-      if (Array.isArray(firstColumnValue) && firstColumnValue.length > 0) {
-        // If it's an array of FileCellData, use file names
-        contentToProcess = firstColumnValue.map(f => f.name).join(', ');
+      if (row.processedContent) {
+        // Decode base64 content to get the actual markdown
+        try {
+          contentToProcess = decodeURIComponent(escape(atob(row.processedContent)));
+        } catch {
+          // If decoding fails, use as-is
+          contentToProcess = row.processedContent;
+        }
+      } else if (row.content && Array.isArray(row.content) && row.content.length > 0) {
+        // Fallback: use file names if no processed content
+        contentToProcess = row.content.map((f: FileCellData) => f.name).join(', ');
       } else {
-        contentToProcess = String(firstColumnValue);
+        // Skip if no content at all
+        continue;
       }
 
       // Process each column for this row
@@ -522,8 +547,10 @@ export function DataGridDemo() {
                 dataGridProps.table.setSorting([]);
               }
 
-              // Create a new row for each file
-              const newRows: Record<string, any>[] = files.map((file: File) => {
+              setIsConverting(true);
+
+              // Create initial rows with pending status
+              const initialRows: RowData[] = files.map((file: File) => {
                 const fileData: FileCellData = {
                   id: crypto.randomUUID(),
                   name: file.name,
@@ -535,10 +562,68 @@ export function DataGridDemo() {
                 return {
                   id: faker.string.nanoid(),
                   content: [fileData],
+                  processingStatus: 'pending' as ProcessingStatus,
                 };
               });
 
-              setData((prev) => [...prev, ...newRows]);
+              // Add rows immediately so user sees them
+              setData((prev) => [...prev, ...initialRows]);
+
+              // Process each file individually for real-time updates
+              for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const rowId = initialRows[i].id;
+
+                // Update status to processing
+                setData((prev) => prev.map((row) => 
+                  row.id === rowId 
+                    ? { ...row, processingStatus: 'processing' as ProcessingStatus }
+                    : row
+                ));
+
+                try {
+                  // Process single file
+                  const result = await processDocumentFiles([file]);
+
+                  if (result.success.length > 0) {
+                    const processedFile = result.success[0];
+                    // Update row with processed content
+                    setData((prev) => prev.map((row) => 
+                      row.id === rowId 
+                        ? { 
+                            ...row, 
+                            processedContent: processedFile.content,
+                            processingStatus: 'completed' as ProcessingStatus,
+                          }
+                        : row
+                    ));
+                  } else if (result.errors.length > 0) {
+                    // Update row with error status
+                    setData((prev) => prev.map((row) => 
+                      row.id === rowId 
+                        ? { 
+                            ...row, 
+                            processingStatus: 'error' as ProcessingStatus,
+                            errorMessage: result.errors[0].error,
+                          }
+                        : row
+                    ));
+                  }
+                } catch (error) {
+                  // Update row with error status
+                  setData((prev) => prev.map((row) => 
+                    row.id === rowId 
+                      ? { 
+                          ...row, 
+                          processingStatus: 'error' as ProcessingStatus,
+                          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+                        }
+                      : row
+                  ));
+                }
+              }
+
+              setIsConverting(false);
             }}
           >
             {isDraggingOver && (
@@ -546,6 +631,18 @@ export function DataGridDemo() {
                 <div className="flex flex-col items-center">
                   <Upload className="w-12 h-12 text-indigo-600 mb-2" />
                   <p className="text-lg font-bold text-indigo-800">Drop files to create new rows</p>
+                </div>
+              </div>
+            )}
+            {/* Conversion Progress Overlay */}
+            {isConverting && (
+              <div className="absolute bottom-4 right-4 z-50 bg-white rounded-xl shadow-xl border border-indigo-100 p-4 flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-200">
+                <div className="bg-indigo-50 p-2 rounded-lg">
+                  <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Processing Documents</p>
+                  <p className="text-xs text-slate-500">Converting files to markdown...</p>
                 </div>
               </div>
             )}
